@@ -1804,11 +1804,12 @@
     function getIndustryData() {
       const name = els.industryName.value.trim();
       if (!name) return null;
-      const sampleKey = resolveIndustryTemplateKey(name);
-      const displayName = sampleKey || name;
+      const context = resolveIndustryInputContext(name);
+      const sampleKey = resolveIndustryTemplateKey(context.analysisIndustry) || resolveIndustryTemplateKey(name);
+      const displayName = sampleKey || context.analysisIndustry;
       const data = industryTemplates[sampleKey] || {
-        overview: `${name} 산업은 최근 수요 성장과 비용 부담이 동시에 커지며, 산업 평균보다 밸류체인별 이익 격차가 확대되는 상황입니다. ${els.scope.value} 범위에서는 최종 시장 규모보다 가격 전가력과 공급 병목이 수익성을 가릅니다.`,
-        overviewInsight: `핵심 해석: ${name}의 핵심은 성장률이 아니라 성장의 이익이 어느 구간에 남는가입니다.`,
+        overview: `${displayName} 산업은 최근 수요 성장과 비용 부담이 동시에 커지며, 산업 평균보다 밸류체인별 이익 격차가 확대되는 상황입니다. ${context.rationale} ${els.scope.value} 범위에서는 최종 시장 규모보다 가격 전가력과 공급 병목이 수익성을 가릅니다.`,
+        overviewInsight: `핵심 해석: ${displayName}의 핵심은 성장률이 아니라 성장의 이익이 어느 구간에 남는가입니다.`,
         chain: [
           ["공급", "원재료, 기술, 핵심 인프라"],
           ["생산/운영", "제조, 서비스 운영, 품질 관리"],
@@ -1821,10 +1822,10 @@
           ["Cost", "고정비, 변동비, 인건비, CAPEX", "비용 구조가 무거울수록 경기 변동 시 이익 변동성이 커집니다."],
           ["Margin driver", "가격 전가력, 규모의 경제, 제품 믹스", "마진 개선의 지속성은 가격보다 구조적 우위에서 나옵니다."]
         ],
-        marketSeries: [100, 110, 122, 136, 151],
+        marketSeries: context.marketSeries || [10, 11.2, 12.6, 14.3, 16.1],
         demandSeries: [100, 114, 131, 149, 170]
       };
-      return { name: displayName, ...data };
+      return { name: displayName, context, ...data };
     }
 
     function resolveIndustryTemplateKey(industry) {
@@ -1835,6 +1836,103 @@
         const normalizedKey = normalizeText(key);
         return normalizedKey === normalized || normalizedKey.includes(normalized) || normalized.includes(normalizedKey);
       }) || "";
+    }
+
+    function resolveIndustryInputContext(rawIndustry) {
+      const originalIndustry = String(rawIndustry || "").trim();
+      const normalized = normalizeText(originalIndustry.replace(/\s*산업\s*$/g, ""));
+      const rules = [
+        {
+          patterns: ["인형", "봉제완구", "완구인형", "plush", "doll", "stuffedtoy", "키덜트", "캐릭터굿즈"],
+          analysisIndustry: "완구 및 캐릭터 IP 굿즈",
+          parentIndustry: "완구, 봉제완구, 캐릭터 라이선싱 상품, 키덜트 수집형 굿즈",
+          segments: ["유아동 완구", "봉제완구·플러시 토이", "패션/수집형 인형", "캐릭터 IP 라이선싱 상품", "키덜트·팬덤 굿즈"],
+          keywords: ["완구 산업", "봉제완구", "인형 시장", "캐릭터 상품", "plush toy market", "doll market", "licensed character merchandise"],
+          marketUnit: "글로벌 완구/캐릭터 상품 시장 규모 추정치, 십억 달러",
+          marketSeries: [103, 108, 114, 121, 129],
+          rationale: "입력 산업명이 세부 품목에 가까워 완구·캐릭터 IP 굿즈를 상위 시장으로 두고, 해당 품목을 세부 세그먼트로 분석합니다."
+        },
+        {
+          patterns: ["문구", "팬시", "스티커", "다꾸", "stationery", "fancygoods"],
+          analysisIndustry: "문구 및 팬시 굿즈",
+          parentIndustry: "문구, 팬시상품, 캐릭터 굿즈, 오피스·학습용품",
+          segments: ["학습·사무 문구", "다이어리/꾸미기 용품", "캐릭터 팬시상품", "온라인 소량 브랜드", "B2B 오피스 소모품"],
+          keywords: ["문구 산업", "팬시 산업", "다꾸 시장", "stationery market", "fancy goods market"],
+          marketUnit: "문구 및 팬시상품 시장 규모 추정치, 조원 또는 십억 달러",
+          marketSeries: [7.8, 8.1, 8.5, 8.9, 9.4],
+          rationale: "입력 산업명이 세부 소비재에 가까워 문구·팬시·캐릭터 굿즈를 상위 시장으로 확장합니다."
+        },
+        {
+          patterns: ["피규어", "collectible", "collectibles", "트레이딩카드", "tcg", "보드게임"],
+          analysisIndustry: "수집형 취미 및 테이블탑 게임",
+          parentIndustry: "키덜트 취미재, 피규어, TCG, 보드게임, 팬덤 커머스",
+          segments: ["피규어/스태츄", "트레이딩 카드", "보드게임", "팬덤 한정판", "중고·리셀 플랫폼"],
+          keywords: ["키덜트 시장", "피규어 시장", "트레이딩 카드 게임", "collectibles market", "tabletop games market"],
+          marketUnit: "수집형 취미재 시장 규모 추정치, 십억 달러",
+          marketSeries: [28, 31, 35, 39, 44],
+          rationale: "입력 산업명이 팬덤형 취미 세그먼트에 가까워 수집형 취미재와 리셀/한정판 시장까지 함께 분석합니다."
+        },
+        {
+          patterns: ["향수", "디퓨저", "캔들", "fragrance", "perfume", "homefragrance"],
+          analysisIndustry: "프래그런스 및 홈센트",
+          parentIndustry: "퍼스널 프래그런스, 홈 프래그런스, 니치 향수, 라이프스타일 소비재",
+          segments: ["니치 향수", "매스 프래그런스", "디퓨저/캔들", "라이프스타일 편집숍", "온라인 D2C 브랜드"],
+          keywords: ["향수 시장", "니치 향수", "디퓨저 시장", "fragrance market", "perfume market"],
+          marketUnit: "프래그런스 시장 규모 추정치, 십억 달러",
+          marketSeries: [56, 59, 63, 67, 72],
+          rationale: "입력 산업명이 세부 향 제품에 가까워 프래그런스와 홈센트 상위 시장으로 확장합니다."
+        },
+        {
+          patterns: ["캠핑", "등산", "아웃도어", "outdoor", "camping", "hiking"],
+          analysisIndustry: "아웃도어 및 캠핑용품",
+          parentIndustry: "아웃도어 의류, 캠핑 장비, 레저용품, 체험형 여가 소비",
+          segments: ["아웃도어 의류", "캠핑 장비", "등산/트레킹 용품", "렌탈·중고 장비", "레저 플랫폼"],
+          keywords: ["캠핑 산업", "아웃도어 시장", "등산용품", "outdoor gear market", "camping equipment market"],
+          marketUnit: "아웃도어/캠핑용품 시장 규모 추정치, 십억 달러",
+          marketSeries: [78, 82, 86, 90, 95],
+          rationale: "입력 산업명이 취미 장비 세그먼트에 가까워 아웃도어 레저용품 시장으로 확장합니다."
+        },
+        {
+          patterns: ["반려", "펫", "강아지", "고양이", "petcare", "petfood", "pet"],
+          analysisIndustry: "펫케어 및 반려동물 용품/서비스",
+          parentIndustry: "펫푸드, 반려동물 용품, 동물병원, 펫보험, 돌봄 서비스",
+          segments: ["펫푸드", "용품/장난감", "동물병원/의료", "펫보험", "미용·호텔·돌봄"],
+          keywords: ["펫케어 산업", "반려동물 시장", "펫푸드 시장", "pet care market", "pet food market"],
+          marketUnit: "펫케어 시장 규모 추정치, 십억 달러",
+          marketSeries: [255, 270, 287, 306, 327],
+          rationale: "입력 산업명이 반려동물 세부 품목에 가까워 펫케어 생태계로 확장합니다."
+        },
+        {
+          patterns: ["디저트", "베이커리", "빵", "케이크", "커피", "카페", "bakery", "dessert", "coffee"],
+          analysisIndustry: "디저트·베이커리 및 카페 F&B",
+          parentIndustry: "외식, 베이커리, 카페, 디저트 전문점, 간편식/프랜차이즈",
+          segments: ["프랜차이즈 카페", "베이커리", "디저트 전문점", "RTD/간편 디저트", "배달·온라인 예약"],
+          keywords: ["디저트 시장", "베이커리 산업", "카페 시장", "bakery market", "dessert market"],
+          marketUnit: "디저트/베이커리 F&B 시장 규모 추정치, 조원 또는 십억 달러",
+          marketSeries: [42, 45, 48, 52, 56],
+          rationale: "입력 산업명이 F&B 세부 품목에 가까워 외식·베이커리·카페 시장으로 확장합니다."
+        }
+      ];
+      const matched = rules.find(rule => rule.patterns.some(pattern => normalized.includes(normalizeText(pattern))));
+      if (matched) return { originalIndustry, isReframed: true, ...matched };
+      const cleanIndustry = originalIndustry.replace(/\s*산업\s*$/g, "").trim() || originalIndustry;
+      const broadPattern = /(자동차|반도체|조선|철강|은행|보험|증권|게임|바이오|제약|화장품|유통|물류|항공|호텔|건설|부동산|통신|미디어|엔터|배터리|에너지|정유|화학|식품|의류|패션|교육|의료|방산|로봇|소프트웨어|클라우드|플랫폼)/;
+      const looksNiche = cleanIndustry.length <= 8 || !broadPattern.test(cleanIndustry);
+      return {
+        originalIndustry,
+        analysisIndustry: cleanIndustry,
+        parentIndustry: looksNiche ? `${cleanIndustry}의 상위 산업, 인접 소비재/서비스 시장, 관련 밸류체인` : cleanIndustry,
+        segments: looksNiche
+          ? [`${cleanIndustry} 직접 시장`, `${cleanIndustry}가 속한 상위 카테고리`, `${cleanIndustry} 대체재/인접재`, `${cleanIndustry} 유통·플랫폼`, `${cleanIndustry} 공급망`]
+          : [`${cleanIndustry} 최종 수요`, `${cleanIndustry} 공급망`, `${cleanIndustry} 생산/운영`, `${cleanIndustry} 채널/서비스`],
+        keywords: [cleanIndustry, `${cleanIndustry} 산업`, `${cleanIndustry} 시장`, `${cleanIndustry} market`, `${cleanIndustry} industry`, `${cleanIndustry} adjacent market`],
+        marketUnit: "시장 규모 추정치, 산업별 적정 단위",
+        marketSeries: null,
+        rationale: looksNiche
+          ? "입력 산업명이 세부 품목 또는 좁은 세그먼트일 가능성이 있어 상위 산업과 인접 시장을 함께 추론해 분석합니다."
+          : "입력 산업명을 그대로 분석 기준으로 사용합니다.",
+        isReframed: looksNiche
+      };
     }
 
     function getCompanyData() {
@@ -2107,25 +2205,28 @@
       const scope = els.scope.value || "분석 범위";
       const period = els.period.value || "분석 기간";
       const years = ["2021", "2022", "2023", "2024", "2025"];
+      const context = data.context || resolveIndustryInputContext(data.name);
       return {
         title: `${data.name} 산업분석`,
-        meta: ["산업분석", scope, period, reportType, "Local preview"],
+        meta: context.isReframed
+          ? ["산업분석", scope, period, reportType, `범위 재정의: ${context.originalIndustry}`]
+          : ["산업분석", scope, period, reportType, "Local preview"],
         industry_overview: {
-          executive_summary: `${data.name} 산업은 최종 수요 성장과 비용 부담이 동시에 작동하는 시장입니다. 이 화면은 AI 생성 전 로컬 미리보기이므로 산업별 세부 수치는 제한적이지만, 보고서 구조는 실제 생성 결과와 동일하게 유지됩니다.`,
+          executive_summary: `${data.name} 산업은 최종 수요 성장과 비용 부담이 동시에 작동하는 시장입니다. ${context.rationale} 이 화면은 AI 생성 전 로컬 미리보기이므로 산업별 세부 수치는 제한적이지만, 보고서 구조는 실제 생성 결과와 동일하게 유지됩니다.`,
           definition: data.overview,
-          market_scope: `${scope} 범위에서는 내수 수요, 글로벌 공급망, 주요 고객사의 투자 사이클, 정책 변화를 함께 반영해야 합니다.`,
+          market_scope: `${scope} 범위에서는 ${context.parentIndustry}까지 자료 탐색 범위를 확장해 봅니다. 특히 세부 품목의 직접 통계가 부족한 경우 상위 산업 규모, 인접 세그먼트 성장률, 채널 데이터, 영문 키워드(${context.keywords.slice(0, 4).join(", ")})를 함께 읽습니다.`,
           current_state: `${period} 기준으로는 시장 확대와 비용 압력이 동시에 나타나는 혼재 국면입니다. 매출 확대가 곧바로 산업 이익 개선으로 이어지려면 가격 전가와 가동률 개선이 함께 필요합니다.`,
-          demand_side: "수요는 최종 소비자 구매력, 기업 고객의 투자 집행, 정책 지원, 기술 전환 속도에 의해 형성됩니다.",
+          demand_side: `수요는 ${context.segments.slice(0, 3).join(", ")}의 구매 빈도, 가격대, 소비자 관심도, 기업 고객의 예산 집행에 의해 형성됩니다.`,
           supply_side: "공급은 핵심 부품, 설비, 인력, 물류, 인증 체계의 제약을 받습니다. 공급 병목이 있는 구간은 단기적으로 협상력이 높아질 수 있습니다.",
           structural_change: "최근 산업 분석의 초점은 단순 시장 성장률보다 고부가 제품 믹스, 장기계약, 플랫폼화, 반복 매출 구조로 이동하고 있습니다."
         },
         market_trend: {
-          unit: "시장 규모 추정치",
+          unit: context.marketUnit,
           series: years.map((year, index) => ({
             year,
             value: (data.marketSeries || [10, 11, 12.2, 13.6, 15.1])[index],
             is_estimated: true,
-            note: "로컬 미리보기 시장 규모 추정",
+            note: context.isReframed ? "세부 품목 직접 통계가 제한적이어서 상위 산업과 인접 시장 기준으로 추정" : "로컬 미리보기 시장 규모 추정",
             source_reference: "local preview"
           })),
           growth_comment: "정식 AI 생성에서는 산업별 적정 단위와 성장률 설명이 채워집니다.",
@@ -2174,7 +2275,7 @@
         },
         sources: [
           { title: "Local preview industry frame", publisher: "BIT Analysis", url: "", used_for: "산업 구조 미리보기" },
-          { title: "External research required", publisher: "증권사/통계/협회/정부 원문", url: "", used_for: "시장 규모와 성장률 수치 검증 필요" }
+          { title: context.keywords.slice(0, 5).join(" / "), publisher: "검색 키워드", url: "", used_for: "상위 산업과 인접 세그먼트 탐색 기준" }
         ]
       };
     }

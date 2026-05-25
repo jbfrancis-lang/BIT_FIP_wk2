@@ -257,6 +257,8 @@ async function fetchWithTimeout(url, options = {}, timeoutMs = 10000) {
 }
 
 async function generateIndustryAnalysis({ industry, scope, period, reportType }) {
+  const industryContext = resolveIndustryContext(industry);
+  const analysisIndustry = industryContext.analysisIndustry;
   const isDeep = isDeepIndustryReport(reportType);
   const payload = {
     model: openaiModel,
@@ -267,6 +269,9 @@ async function generateIndustryAnalysis({ industry, scope, period, reportType })
       "Avoid vague guidance such as '봐야 합니다', '확인해야 합니다', '설명하면 좋습니다'. Instead state what is happening in the industry and why it matters.",
       "Each long string field should be 2-4 complete Korean sentences with concrete sector context, not a one-line placeholder.",
       "For value chain rows, write in plain business language. Do not use abstract phrases like '대체재가 적거나 병목을 가진 공급자' without naming the actual actor group or bottleneck type.",
+      "If the user's industry input is narrow, colloquial, or ambiguous, reframe it into a researchable parent industry and then analyze the original input as a segment inside that parent industry.",
+      "When reframing, state the reframed scope in market_scope and executive_summary, but do not turn it into user advice. The report should read as an industry report.",
+      "Use both Korean and English keyword context when thinking about sparse categories, especially for consumer goods, IP goods, and niche manufacturing segments.",
       "Use an answer-first, causal, detailed Korean business-report tone.",
       "Market trend must be market-size level data, not an index like 100/120/80. Use a real unit such as '십억 달러', '조원', '백만 대', or another industry-appropriate unit.",
       "Do not fabricate exact market sizes, stock returns, financial statements, or news dates. If exact data is uncertain, use broad estimated market-size figures, mark is_estimated true, and explain the uncertainty in data_quality_note and source_reference.",
@@ -274,7 +279,12 @@ async function generateIndustryAnalysis({ industry, scope, period, reportType })
       "Return only valid JSON matching the requested schema."
     ].join("\n"),
     input: [
-      `산업명: ${industry}`,
+      `사용자 입력 산업명: ${industryContext.originalIndustry}`,
+      `분석 기준 산업명: ${analysisIndustry}`,
+      `상위 산업/자료 탐색 범위: ${industryContext.parentIndustry}`,
+      `세부 세그먼트: ${industryContext.segments.join(", ")}`,
+      `한글/영문 리서치 키워드: ${industryContext.keywords.join(", ")}`,
+      `범위 재정의 메모: ${industryContext.rationale}`,
       `분석 범위: ${scope}`,
       `분석 기간: ${period}`,
       `리포트 유형: ${reportType}`,
@@ -315,11 +325,172 @@ async function generateIndustryAnalysis({ industry, scope, period, reportType })
   const text = extractResponseText(data);
   if (!text) throw new Error("OpenAI response did not contain output text.");
   const parsed = JSON.parse(text);
-  return normalizeIndustryAnalysis(parsed, { industry, scope, period, reportType });
+  return normalizeIndustryAnalysis(parsed, { industry: analysisIndustry, scope, period, reportType, industryContext });
 }
 
 function isDeepIndustryReport(reportType) {
   return /심층|deep/i.test(String(reportType || ""));
+}
+
+function resolveIndustryContext(rawIndustry) {
+  const originalIndustry = String(rawIndustry || "").trim();
+  const normalized = normalizeSearchText(originalIndustry.replace(/산업$/g, ""));
+  const makeContext = ({
+    patterns,
+    analysisIndustry,
+    parentIndustry,
+    segments,
+    keywords,
+    marketUnit,
+    marketSeries,
+    rationale,
+    valueChain = null,
+    revenueSources = null,
+    costDrivers = null
+  }) => ({
+    patterns,
+    analysisIndustry,
+    parentIndustry,
+    segments,
+    keywords,
+    marketUnit,
+    marketSeries,
+    rationale,
+    valueChain,
+    revenueSources,
+    costDrivers
+  });
+  const rules = [
+    makeContext({
+      patterns: [/인형/, /봉제완구/, /완구인형/, /plush/, /doll/, /stuffedtoy/, /키덜트/, /캐릭터굿즈/],
+      analysisIndustry: "완구 및 캐릭터 IP 굿즈",
+      parentIndustry: "완구, 봉제완구, 캐릭터 라이선싱 상품, 키덜트 수집형 굿즈",
+      segments: ["유아동 완구", "봉제완구·플러시 토이", "패션/수집형 인형", "캐릭터 IP 라이선싱 상품", "키덜트·팬덤 굿즈"],
+      keywords: ["완구 산업", "봉제완구", "인형 시장", "캐릭터 상품", "키덜트 시장", "toy market", "plush toy market", "doll market", "licensed character merchandise", "collectibles market"],
+      marketUnit: "글로벌 완구/캐릭터 상품 시장 규모 추정치, 십억 달러",
+      marketSeries: [103, 108, 114, 121, 129],
+      rationale: "인형은 독립 산업 통계가 제한적이므로 완구·캐릭터 IP 굿즈를 상위 시장으로 두고, 봉제완구와 수집형 인형을 세부 세그먼트로 분석합니다.",
+      valueChain: [
+        { stage: "IP / Design", participants: "캐릭터 IP 보유사, 디자인 스튜디오, 라이선싱 에이전시", role: "캐릭터 세계관, 디자인 원형, 라이선스 권리를 제공하며 제품 차별화의 출발점이 됩니다.", revenue_model: "라이선스 로열티, 디자인 용역, 공동기획 수수료에서 매출이 발생합니다.", cost_structure: "IP 개발비, 디자인 인력비, 마케팅비, 법무·계약 비용이 주요 부담입니다.", margin_power: "인지도 높은 IP와 팬덤을 가진 권리자는 제조사보다 높은 협상력을 확보합니다.", report_implication: "인형 세그먼트의 이익은 단순 제조보다 IP 권리와 팬덤 전환력에 더 크게 좌우됩니다." },
+        { stage: "Materials / OEM", participants: "원단·충전재 공급자, 봉제 OEM/ODM, 안전 인증 기관", role: "봉제완구와 인형을 실제 제품으로 전환하고 품질, 안전성, 납기, 원가를 결정합니다.", revenue_model: "OEM 생산 단가, ODM 기획 생산, 대량 납품 계약으로 매출이 발생합니다.", cost_structure: "원단·충전재, 인건비, 물류비, 안전 인증과 품질관리 비용이 핵심입니다.", margin_power: "대체 생산지가 많으면 마진은 낮지만, 소량 다품종·고품질 봉제 역량이나 인증 경험이 있으면 협상력이 올라갑니다.", report_implication: "제조 단계는 규모보다 품질 안정성과 빠른 SKU 전환 능력이 수익성을 가릅니다." },
+        { stage: "Brand / Merchandising", participants: "완구 브랜드, 캐릭터 상품사, 팬덤 굿즈 기획사, 유통 PB", role: "상품 콘셉트, 가격대, 한정판 전략, 패키징을 설계해 수요를 제품 매출로 전환합니다.", revenue_model: "완제품 판매, 한정판 드롭, 콜라보 상품, 굿즈 번들 매출이 발생합니다.", cost_structure: "재고 부담, 마케팅비, 라이선스 비용, 반품·폐기 비용이 주요 리스크입니다.", margin_power: "브랜드 팬덤과 희소성 설계가 가능하면 가격 할인 없이도 판매가 유지됩니다.", report_implication: "수집형 인형은 완구보다 패션·팬덤 소비재에 가까워 재고 회전과 희소성 관리가 중요합니다." },
+        { stage: "Retail / Platform", participants: "온라인몰, 대형마트, 팬덤 플랫폼, 팝업스토어, 역직구 채널", role: "제품을 소비자에게 노출하고 구매 전환, 예약 판매, 재판매 가격 형성에 영향을 줍니다.", revenue_model: "유통 마진, 플랫폼 수수료, 광고·노출 상품, 팝업 매출이 발생합니다.", cost_structure: "물류비, 판매수수료, 재고 보관비, 오프라인 운영비가 비용으로 작동합니다.", margin_power: "팬덤 접근성과 예약·한정 판매 데이터를 가진 채널이 높은 교섭력을 가집니다.", report_implication: "채널은 단순 판매처가 아니라 수요 예측과 가격 방어를 좌우하는 데이터 접점입니다." }
+      ],
+      revenueSources: [
+        { source: "Licensed IP Goods", mechanism: "캐릭터·애니메이션·게임 IP를 인형과 굿즈로 전환해 완제품 판매와 로열티 매출을 만듭니다.", sensitivity: "IP 흥행, 신작 공개, 팬덤 규모, 라이선스 계약 조건에 민감합니다." },
+        { source: "Collectible / Limited Edition", mechanism: "한정판, 시즌 상품, 콜라보 제품을 통해 일반 완구보다 높은 ASP와 반복 구매를 만듭니다.", sensitivity: "희소성 설계가 약하거나 재고가 과도하면 할인 판매로 마진이 훼손됩니다." },
+        { source: "Mass Toy Retail", mechanism: "유아동 완구 채널과 온라인몰에서 물량 기반 매출이 발생합니다.", sensitivity: "출산율, 소비 경기, 대형 유통 채널의 가격 정책에 민감합니다." }
+      ],
+      costDrivers: [
+        { cost: "License / IP cost", mechanism: "인기 캐릭터를 사용할수록 선급금과 로열티 부담이 커집니다.", risk: "IP 흥행이 기대보다 낮으면 고정성 라이선스 비용이 재고 손실로 전이됩니다." },
+        { cost: "Textile / labor / safety", mechanism: "원단, 충전재, 봉제 인건비, KC·CE 등 안전 인증 비용이 제조 원가를 구성합니다.", risk: "저가 제품 경쟁이 심하면 원가 상승분을 소비자가격에 전가하기 어렵습니다." },
+        { cost: "Inventory / channel", mechanism: "시즌성 상품과 캐릭터 유행 상품은 재고 보관, 반품, 폐기 비용이 발생합니다.", risk: "수요 예측 실패 시 가격 할인과 재고평가손실이 동시에 나타납니다." }
+      ]
+    }),
+    makeContext({
+      patterns: [/문구/, /팬시/, /스티커/, /다꾸/, /stationery/, /fancygoods/],
+      analysisIndustry: "문구 및 팬시 굿즈",
+      parentIndustry: "문구, 팬시상품, 캐릭터 굿즈, 오피스·학습용품",
+      segments: ["학습·사무 문구", "다이어리/꾸미기 용품", "캐릭터 팬시상품", "온라인 소량 브랜드", "B2B 오피스 소모품"],
+      keywords: ["문구 산업", "팬시 산업", "다꾸 시장", "캐릭터 문구", "stationery market", "fancy goods market", "character stationery"],
+      marketUnit: "문구 및 팬시상품 시장 규모 추정치, 조원 또는 십억 달러",
+      marketSeries: [7.8, 8.1, 8.5, 8.9, 9.4],
+      rationale: "문구·팬시류는 단일 품목보다 학습/사무 수요, 캐릭터 IP, 온라인 소량 브랜드가 결합된 상위 시장으로 분석해야 자료 탐색이 안정적입니다."
+    }),
+    makeContext({
+      patterns: [/피규어/, /collectible/, /collectibles/, /트레이딩카드/, /tcg/, /보드게임/],
+      analysisIndustry: "수집형 취미 및 테이블탑 게임",
+      parentIndustry: "키덜트 취미재, 피규어, TCG, 보드게임, 팬덤 커머스",
+      segments: ["피규어/스태츄", "트레이딩 카드", "보드게임", "팬덤 한정판", "중고·리셀 플랫폼"],
+      keywords: ["키덜트 시장", "피규어 시장", "트레이딩 카드 게임", "보드게임 산업", "collectibles market", "trading card game market", "tabletop games market"],
+      marketUnit: "수집형 취미재 시장 규모 추정치, 십억 달러",
+      marketSeries: [28, 31, 35, 39, 44],
+      rationale: "수집형 취미재는 완구 통계만으로 설명하기 어렵고 팬덤, IP, 리셀, 한정판 가격 형성까지 함께 봐야 합니다."
+    }),
+    makeContext({
+      patterns: [/향수/, /디퓨저/, /캔들/, /fragrance/, /perfume/, /homefragrance/],
+      analysisIndustry: "프래그런스 및 홈센트",
+      parentIndustry: "퍼스널 프래그런스, 홈 프래그런스, 니치 향수, 라이프스타일 소비재",
+      segments: ["니치 향수", "매스 프래그런스", "디퓨저/캔들", "라이프스타일 편집숍", "온라인 D2C 브랜드"],
+      keywords: ["향수 시장", "니치 향수", "디퓨저 시장", "fragrance market", "perfume market", "home fragrance market", "niche fragrance"],
+      marketUnit: "프래그런스 시장 규모 추정치, 십억 달러",
+      marketSeries: [56, 59, 63, 67, 72],
+      rationale: "향 관련 품목은 화장품, 라이프스타일, 홈센트로 자료가 흩어져 있어 프래그런스 상위 시장과 세부 채널을 함께 잡아야 합니다."
+    }),
+    makeContext({
+      patterns: [/캠핑/, /등산/, /아웃도어/, /outdoor/, /camping/, /hiking/],
+      analysisIndustry: "아웃도어 및 캠핑용품",
+      parentIndustry: "아웃도어 의류, 캠핑 장비, 레저용품, 체험형 여가 소비",
+      segments: ["아웃도어 의류", "캠핑 장비", "등산/트레킹 용품", "렌탈·중고 장비", "레저 플랫폼"],
+      keywords: ["캠핑 산업", "아웃도어 시장", "등산용품", "outdoor gear market", "camping equipment market", "hiking gear market"],
+      marketUnit: "아웃도어/캠핑용품 시장 규모 추정치, 십억 달러",
+      marketSeries: [78, 82, 86, 90, 95],
+      rationale: "캠핑·등산 같은 취미 카테고리는 장비, 의류, 플랫폼, 중고/렌탈 시장이 함께 움직이므로 아웃도어 레저용품으로 확장합니다."
+    }),
+    makeContext({
+      patterns: [/반려/, /펫/, /강아지/, /고양이/, /petcare/, /petfood/, /pet/],
+      analysisIndustry: "펫케어 및 반려동물 용품/서비스",
+      parentIndustry: "펫푸드, 반려동물 용품, 동물병원, 펫보험, 돌봄 서비스",
+      segments: ["펫푸드", "용품/장난감", "동물병원/의료", "펫보험", "미용·호텔·돌봄"],
+      keywords: ["펫케어 산업", "반려동물 시장", "펫푸드 시장", "pet care market", "pet food market", "pet services market"],
+      marketUnit: "펫케어 시장 규모 추정치, 십억 달러",
+      marketSeries: [255, 270, 287, 306, 327],
+      rationale: "반려동물 관련 품목은 단일 제품보다 식품, 의료, 보험, 서비스가 결합된 펫케어 생태계로 분석하는 편이 적절합니다."
+    }),
+    makeContext({
+      patterns: [/디저트/, /베이커리/, /빵/, /케이크/, /커피/, /카페/, /bakery/, /dessert/, /coffee/],
+      analysisIndustry: "디저트·베이커리 및 카페 F&B",
+      parentIndustry: "외식, 베이커리, 카페, 디저트 전문점, 간편식/프랜차이즈",
+      segments: ["프랜차이즈 카페", "베이커리", "디저트 전문점", "RTD/간편 디저트", "배달·온라인 예약"],
+      keywords: ["디저트 시장", "베이커리 산업", "카페 시장", "bakery market", "dessert market", "coffee shop market", "foodservice market"],
+      marketUnit: "디저트/베이커리 F&B 시장 규모 추정치, 조원 또는 십억 달러",
+      marketSeries: [42, 45, 48, 52, 56],
+      rationale: "디저트·카페류는 품목 하나보다 외식 채널, 프랜차이즈, 원재료, 배달/예약 플랫폼이 결합된 F&B 시장으로 분석해야 합니다."
+    })
+  ];
+
+  const matched = rules.find(rule => rule.patterns.some(pattern => pattern.test(normalized)));
+  if (matched) {
+    return {
+      originalIndustry,
+      analysisIndustry: matched.analysisIndustry,
+      parentIndustry: matched.parentIndustry,
+      segments: matched.segments,
+      keywords: matched.keywords,
+      marketUnit: matched.marketUnit,
+      marketSeries: matched.marketSeries,
+      rationale: matched.rationale,
+      valueChain: matched.valueChain,
+      revenueSources: matched.revenueSources,
+      costDrivers: matched.costDrivers,
+      isReframed: true
+    };
+  }
+
+  const cleanIndustry = originalIndustry.replace(/\s*산업\s*$/g, "").trim() || originalIndustry;
+  const looksNiche = cleanIndustry.length <= 8 || !/(자동차|반도체|조선|철강|은행|보험|증권|게임|바이오|제약|화장품|유통|물류|항공|호텔|건설|부동산|통신|미디어|엔터|배터리|에너지|정유|화학|식품|의류|패션|교육|의료|방산|로봇|소프트웨어|클라우드|플랫폼)/.test(cleanIndustry);
+  return {
+    originalIndustry,
+    analysisIndustry: cleanIndustry,
+    parentIndustry: looksNiche ? `${cleanIndustry}의 상위 산업, 인접 소비재/서비스 시장, 관련 밸류체인` : cleanIndustry,
+    segments: looksNiche
+      ? [`${cleanIndustry} 직접 시장`, `${cleanIndustry}가 속한 상위 카테고리`, `${cleanIndustry} 대체재/인접재`, `${cleanIndustry} 유통·플랫폼`, `${cleanIndustry} 공급망`]
+      : [`${cleanIndustry} 최종 수요`, `${cleanIndustry} 공급망`, `${cleanIndustry} 생산/운영`, `${cleanIndustry} 채널/서비스`],
+    keywords: [cleanIndustry, `${cleanIndustry} 산업`, `${cleanIndustry} 시장`, `${cleanIndustry} value chain`, `${cleanIndustry} market`, `${cleanIndustry} industry`, `${cleanIndustry} adjacent market`, `${cleanIndustry} segment`],
+    marketUnit: "시장 규모 추정치, 산업별 적정 단위",
+    marketSeries: null,
+    rationale: looksNiche
+      ? "입력 산업명이 세부 품목 또는 좁은 세그먼트일 가능성이 있어, 상위 산업과 인접 시장을 함께 추론해 분석합니다."
+      : "입력 산업명을 그대로 분석 기준으로 사용합니다.",
+    valueChain: null,
+    revenueSources: null,
+    costDrivers: null,
+    isReframed: looksNiche
+  };
+}
+
+function normalizeSearchText(value) {
+  return String(value || "").toLowerCase().replace(/[\s.,·_\-\/]/g, "");
 }
 
 function industryAnalysisSchema(options = {}) {
@@ -653,52 +824,55 @@ function normalizeSeries(series, fallback) {
   return series.map(Number);
 }
 
-function buildIndustryFallback({ industry, scope, period, reportType }) {
+function buildIndustryFallback({ industry, scope, period, reportType, industryContext: providedIndustryContext }) {
+  const industryContext = providedIndustryContext || resolveIndustryContext(industry);
+  const displayIndustry = industryContext.analysisIndustry || industry;
   const currentYear = new Date().getFullYear();
   const years = Array.from({ length: 5 }, (_, index) => String(currentYear - 4 + index));
+  const valueChain = industryContext.valueChain || [
+    { stage: "Upstream", participants: "원재료 공급자, 핵심 부품사, 기술/IP 보유 기업, 설비 업체", role: "산업 생산에 필요한 투입 요소와 기술 기반을 제공합니다. 이 구간의 공급 안정성이 낮으면 하위 단계의 생산량과 원가가 동시에 흔들립니다.", revenue_model: "장기 공급계약, 부품 판매, 기술 라이선스, 장비 판매에서 매출이 발생합니다.", cost_structure: "원재료 조달비, 연구개발비, 설비투자, 인증 비용이 주요 부담입니다.", margin_power: "대체 공급자가 적고 고객 인증 장벽이 높은 품목일수록 가격 협상력이 높습니다.", report_implication: "산업 수익성은 최종 수요보다 핵심 투입 요소의 공급 부족 여부에 먼저 반응할 수 있습니다." },
+    { stage: "Production / Operation", participants: "제조사, 운영사, 서비스 제공자, 품질·공정 관리 조직", role: "투입 요소를 제품이나 서비스로 전환하고 품질, 수율, 납기, 운영 효율을 관리합니다.", revenue_model: "제품 판매, 프로젝트 수주, 서비스 이용료, 생산량 기반 계약에서 매출이 발생합니다.", cost_structure: "감가상각, 인건비, 에너지 비용, 외주비, 품질보증비 등 고정비와 준고정비 부담이 큽니다.", margin_power: "가동률이 올라갈수록 고정비 흡수 효과가 커지지만, 수요 둔화기에는 손익 훼손이 빠르게 나타납니다.", report_implication: "생산 단계의 핵심은 성장률보다 수율, 가동률, 원가 전가력입니다." },
+    { stage: "Channel / Platform", participants: "유통사, 플랫폼, 대형 고객사, B2B 영업망, 애프터마켓 사업자", role: "제품과 서비스를 고객에게 전달하고 반복 구매, 유지보수, 데이터, 고객 관계를 축적합니다.", revenue_model: "유통 마진, 플랫폼 수수료, 구독료, 유지보수, 장기 계약 매출이 발생합니다.", cost_structure: "판매관리비, 물류비, 고객 획득 비용, 플랫폼 운영비가 주요 비용입니다.", margin_power: "고객 전환 비용이 높거나 유통 접점이 제한된 경우 채널 단계가 높은 협상력을 확보합니다.", report_implication: "채널을 장악한 기업은 제조 마진이 낮아져도 반복 매출과 고객 데이터를 통해 산업 내 이익을 방어할 수 있습니다." },
+    { stage: "End Demand", participants: "최종 소비자, 기업 고객, 정부·공공기관, 글로벌 바이어", role: "산업의 전체 수요 규모와 투자 사이클을 결정합니다.", revenue_model: "최종 구매, 교체 수요, 기업 투자, 공공 조달, 보조금 기반 수요에서 매출 기회가 발생합니다.", cost_structure: "최종 고객 단계에서는 가격 민감도, 금융비용, 규제 비용, 보조금 변화가 구매 결정을 좌우합니다.", margin_power: "수요가 강해도 최종 고객의 가격 민감도가 높으면 상위 밸류체인의 가격 인상 여지는 제한됩니다.", report_implication: "최종 수요 확대가 산업 전체의 이익 증가로 연결되려면 가격 인상과 비용 전가가 동시에 가능해야 합니다." }
+  ];
   return {
-    title: `${industry} 산업분석`,
-    meta: ["산업분석", scope, period, reportType],
+    title: `${displayIndustry} 산업분석`,
+    meta: industryContext.isReframed ? ["산업분석", scope, period, reportType, `범위 재정의: ${industryContext.originalIndustry}`] : ["산업분석", scope, period, reportType],
     industry_overview: {
-      executive_summary: `${industry} 산업은 최종 수요, 공급망, 가격 결정 구조, 규제 변화가 동시에 작동하는 시장입니다. 현재 로컬 fallback은 원문 리서치가 붙기 전의 구조화된 보고서 초안이며, OpenAI 생성이 성공하면 산업별 맥락을 더 구체화합니다.`,
-      definition: `${industry} 산업은 제품·서비스를 생산하는 사업자, 핵심 부품과 인프라 공급자, 유통·플랫폼, 최종 고객 수요가 연결된 가치사슬로 구성됩니다. 산업의 매력도는 시장 규모뿐 아니라 가격 결정권, 고정비 부담, 고객 락인, 규제 변화가 어떻게 결합되는지에 따라 달라집니다.`,
-      market_scope: `${scope} 범위에서는 내수 수요만이 아니라 글로벌 공급망, 주요 고객군의 투자 사이클, 정책·규제 환경까지 함께 반영해야 합니다. 특히 수출 비중이 높거나 핵심 부품을 해외에 의존하는 산업은 환율, 관세, 지정학 변수가 산업 수익성에 직접 영향을 줍니다.`,
-      current_state: `${period} 기준으로는 수요 성장과 비용 부담이 동시에 존재하는 혼재 국면입니다. 매출이 늘어나는 구간에서도 원가 상승, 과잉 증설, 경쟁 심화가 겹치면 산업 전체 이익률은 기대보다 낮게 형성될 수 있습니다.`,
-      demand_side: "수요는 최종 소비자의 구매력, 기업 고객의 CAPEX, 정책 지원, 교체 주기, 기술 전환에 의해 형성됩니다. 단기 수요가 강해도 장기 계약이나 반복 매출 구조가 약하면 산업의 실적 가시성은 낮아질 수 있습니다.",
-      supply_side: "공급 측면에서는 핵심 부품, 인력, 설비, 기술 인증, 물류, 에너지 비용이 병목으로 작동합니다. 공급 제약이 있는 구간은 가격 협상력을 얻지만, 증설이 빠르게 진행되면 같은 구간이 중기적으로 마진 압박 요인으로 바뀔 수 있습니다.",
+      executive_summary: `${displayIndustry} 산업은 최종 수요, 공급망, 가격 결정 구조, 규제 변화가 동시에 작동하는 시장입니다. ${industryContext.rationale} 현재 로컬 fallback은 원문 리서치가 붙기 전의 구조화된 보고서 초안이며, OpenAI 생성이 성공하면 산업별 맥락을 더 구체화합니다.`,
+      definition: `${displayIndustry} 산업은 ${industryContext.segments.join(", ")}을 포함해 제품·서비스 생산자, 핵심 투입 요소 공급자, 유통·플랫폼, 최종 고객 수요가 연결된 가치사슬로 구성됩니다. 산업의 매력도는 시장 규모뿐 아니라 가격 결정권, 고정비 부담, 고객 락인, 규제 변화가 어떻게 결합되는지에 따라 달라집니다.`,
+      market_scope: `${scope} 범위에서는 ${industryContext.parentIndustry}까지 자료 탐색 범위를 확장해 봅니다. 특히 세부 품목의 직접 통계가 부족한 경우 상위 산업 규모, 인접 세그먼트 성장률, 채널 데이터, 영문 키워드(${industryContext.keywords.slice(0, 4).join(", ")})를 함께 읽어야 시장의 실제 위치가 드러납니다.`,
+      current_state: `${period} 기준으로는 수요 성장과 비용 부담이 동시에 존재하는 혼재 국면입니다. ${displayIndustry}은 특정 품목 수요만으로 판단하기보다 상위 카테고리의 소비 흐름, 유통 채널 변화, 공급 원가 변동을 함께 반영해야 합니다.`,
+      demand_side: `수요는 ${industryContext.segments.slice(0, 3).join(", ")}의 구매 빈도, 가격대, 소비자 관심도, 기업 고객의 예산 집행에 의해 형성됩니다. 단기 유행이 강해도 반복 구매나 장기 계약 구조가 약하면 실적 가시성은 낮아질 수 있습니다.`,
+      supply_side: "공급 측면에서는 핵심 부품, 원재료, 인력, 설비, 기술 인증, 물류, 에너지 비용이 병목으로 작동합니다. 공급 제약이 있는 구간은 가격 협상력을 얻지만, 대체 공급과 증설이 빠르게 진행되면 같은 구간이 중기적으로 마진 압박 요인으로 바뀔 수 있습니다.",
       structural_change: "구조적으로는 단순 물량 성장보다 고부가 제품 믹스, 플랫폼화, 장기계약, 운영 효율화가 산업 이익을 좌우하는 방향으로 이동하고 있습니다. 따라서 산업 분석은 시장 규모 확대와 이익이 남는 가치사슬 구간을 함께 분리해 읽는 구조입니다."
     },
     market_trend: {
-      unit: "시장 규모 추정치, 산업별 적정 단위",
+      unit: industryContext.marketUnit,
       series: years.map((year, index) => ({
         year,
-        value: [10, 11.2, 12.6, 14.3, 16.1][index],
+        value: (industryContext.marketSeries || [10, 11.2, 12.6, 14.3, 16.1])[index],
         is_estimated: true,
-        note: "외부 원문 리서치 미연결 상태의 시장 규모 방향성 추정",
+        note: industryContext.isReframed ? "세부 품목 직접 통계가 제한적이어서 상위 산업과 인접 시장 기준으로 추정" : "외부 원문 리서치 미연결 상태의 시장 규모 방향성 추정",
         source_reference: "local fallback"
       })),
       growth_comment: "로컬 fallback에서는 실제 외부 통계가 연결되어 있지 않아 절대값보다 성장 방향성만 제시합니다.",
       data_quality_note: "정식 리포트에서는 협회 통계, 정부 통계, 증권사 리포트, 글로벌 리서치 기관 자료로 시장 규모 단위를 확정해야 합니다.",
-      interpretation: `${period} 관점에서 ${industry} 산업은 시장 규모가 커지는 흐름과 비용 부담이 함께 나타나는 구조입니다. 따라서 시장 확대가 곧바로 산업 수익성 개선으로 이어지는지, 아니면 특정 가치사슬 구간에만 이익이 집중되는지를 분리해 해석해야 합니다.`
+      interpretation: `${period} 관점에서 ${displayIndustry} 산업은 시장 규모가 커지는 흐름과 비용 부담이 함께 나타나는 구조입니다. 따라서 시장 확대가 곧바로 산업 수익성 개선으로 이어지는지, 아니면 특정 가치사슬 구간에만 이익이 집중되는지를 분리해 해석해야 합니다.`
     },
-    value_chain: [
-      { stage: "Upstream", participants: "원재료 공급자, 핵심 부품사, 기술/IP 보유 기업, 설비 업체", role: "산업 생산에 필요한 투입 요소와 기술 기반을 제공합니다. 이 구간의 공급 안정성이 낮으면 하위 단계의 생산량과 원가가 동시에 흔들립니다.", revenue_model: "장기 공급계약, 부품 판매, 기술 라이선스, 장비 판매에서 매출이 발생합니다.", cost_structure: "원재료 조달비, 연구개발비, 설비투자, 인증 비용이 주요 부담입니다.", margin_power: "대체 공급자가 적고 고객 인증 장벽이 높은 품목일수록 가격 협상력이 높습니다.", report_implication: "산업 수익성은 최종 수요보다 핵심 투입 요소의 공급 부족 여부에 먼저 반응할 수 있습니다." },
-      { stage: "Production / Operation", participants: "제조사, 운영사, 서비스 제공자, 품질·공정 관리 조직", role: "투입 요소를 제품이나 서비스로 전환하고 품질, 수율, 납기, 운영 효율을 관리합니다.", revenue_model: "제품 판매, 프로젝트 수주, 서비스 이용료, 생산량 기반 계약에서 매출이 발생합니다.", cost_structure: "감가상각, 인건비, 에너지 비용, 외주비, 품질보증비 등 고정비와 준고정비 부담이 큽니다.", margin_power: "가동률이 올라갈수록 고정비 흡수 효과가 커지지만, 수요 둔화기에는 손익 훼손이 빠르게 나타납니다.", report_implication: "생산 단계의 핵심은 성장률보다 수율, 가동률, 원가 전가력입니다." },
-      { stage: "Channel / Platform", participants: "유통사, 플랫폼, 대형 고객사, B2B 영업망, 애프터마켓 사업자", role: "제품과 서비스를 고객에게 전달하고 반복 구매, 유지보수, 데이터, 고객 관계를 축적합니다.", revenue_model: "유통 마진, 플랫폼 수수료, 구독료, 유지보수, 장기 계약 매출이 발생합니다.", cost_structure: "판매관리비, 물류비, 고객 획득 비용, 플랫폼 운영비가 주요 비용입니다.", margin_power: "고객 전환 비용이 높거나 유통 접점이 제한된 경우 채널 단계가 높은 협상력을 확보합니다.", report_implication: "채널을 장악한 기업은 제조 마진이 낮아져도 반복 매출과 고객 데이터를 통해 산업 내 이익을 방어할 수 있습니다." },
-      { stage: "End Demand", participants: "최종 소비자, 기업 고객, 정부·공공기관, 글로벌 바이어", role: "산업의 전체 수요 규모와 투자 사이클을 결정합니다.", revenue_model: "최종 구매, 교체 수요, 기업 투자, 공공 조달, 보조금 기반 수요에서 매출 기회가 발생합니다.", cost_structure: "최종 고객 단계에서는 가격 민감도, 금융비용, 규제 비용, 보조금 변화가 구매 결정을 좌우합니다.", margin_power: "수요가 강해도 최종 고객의 가격 민감도가 높으면 상위 밸류체인의 가격 인상 여지는 제한됩니다.", report_implication: "최종 수요 확대가 산업 전체의 이익 증가로 연결되려면 가격 인상과 비용 전가가 동시에 가능해야 합니다." }
-    ],
+    value_chain: valueChain,
     revenue_cost_structure: {
-      revenue_sources: [
+      revenue_sources: industryContext.revenueSources || [
         { source: "Volume", mechanism: "최종 수요, 교체주기, 고객사 투자 집행이 물량을 만듭니다.", sensitivity: "경기와 고객 예산에 민감합니다." },
         { source: "Price / ASP", mechanism: "공급 부족, 고부가 제품 믹스, 브랜드/기술 우위가 가격을 만듭니다.", sensitivity: "경쟁 심화와 증설 속도에 민감합니다." },
         { source: "Recurring / Contract", mechanism: "장기계약, 구독, 유지보수, 반복 구매가 매출 안정성을 만듭니다.", sensitivity: "고객 락인과 전환 비용에 민감합니다." }
       ],
-      cost_drivers: [
+      cost_drivers: industryContext.costDrivers || [
         { cost: "Input cost", mechanism: "원재료, 핵심 부품, 에너지, 물류비가 원가를 압박합니다.", risk: "가격 전가력이 약하면 매출 증가에도 마진이 훼손됩니다." },
         { cost: "Fixed cost / CAPEX", mechanism: "설비 투자, 감가상각, 인건비, R&D가 고정비 부담을 만듭니다.", risk: "수요 둔화 시 가동률 하락이 이익률을 빠르게 낮춥니다." },
         { cost: "Compliance / Quality", mechanism: "규제 대응, 인증, 품질보증, 안전 비용이 필요합니다.", risk: "인증 지연과 품질 이슈는 출하와 수익성을 동시에 훼손합니다." }
       ],
-      profit_pool_insight: `${industry} 산업의 profit pool은 최종 수요가 가장 큰 곳이 아니라, 공급 병목·고객 락인·가격 전가력을 가진 구간에 남습니다.`
+      profit_pool_insight: `${displayIndustry} 산업의 profit pool은 최종 수요가 가장 큰 곳이 아니라, 공급 병목·고객 락인·가격 전가력을 가진 구간에 남습니다.`
     },
     key_variables: [
       { variable: "최종 수요 성장", current_signal: "수요 자체는 산업 외형을 지지하지만, 가격 경쟁이 심하면 수익성 개선은 제한될 수 있습니다.", impact_on_industry: "수요가 꾸준하면 가동률과 투자 명분은 좋아지지만, 공급 확대가 더 빠르면 마진은 압박받습니다.", affected_value_chain: "End Demand, Production / Operation", evidence_to_watch: "시장 규모, 침투율, 고객사 CAPEX, 재고 수준" },
@@ -707,7 +881,7 @@ function buildIndustryFallback({ industry, scope, period, reportType }) {
       { variable: "정책/규제", current_signal: "정책은 수요를 앞당기거나 진입장벽을 높일 수 있지만, 동시에 비용과 불확실성도 만듭니다.", impact_on_industry: "보조금과 규제는 특정 기술·제품군의 성장 속도를 바꾸고, 기존 사업자의 투자 우선순위를 재배치합니다.", affected_value_chain: "전 밸류체인", evidence_to_watch: "보조금, 관세, 인허가, 환경·안전 규제 변경" }
     ],
     deep_dive: {
-      headline_thesis: `${industry} 산업의 심층 분석은 수요 성장, 공급 제약, 가격 전가력, 정책 변화가 어느 방향으로 결합되는지에 달려 있습니다. 이 블록은 증권사 산업 리포트처럼 주요 이슈 플로우와 세부 섹터별 판단을 분리해 보여주기 위한 구조입니다.`,
+      headline_thesis: `${displayIndustry} 산업의 심층 분석은 수요 성장, 공급 제약, 가격 전가력, 정책 변화가 어느 방향으로 결합되는지에 달려 있습니다. 이 블록은 증권사 산업 리포트처럼 주요 이슈 플로우와 세부 섹터별 판단을 분리해 보여주기 위한 구조입니다.`,
       issue_flow: [
         { issue: "수요 사이클 변화", evidence: "최종 수요와 고객사 투자 집행이 산업 외형을 결정합니다.", industry_impact: "수요 확대가 가격 인상으로 이어지면 산업 이익률이 개선되지만, 공급 증가가 더 빠르면 매출 성장에도 마진은 제한됩니다." },
         { issue: "공급망 병목", evidence: "핵심 부품, 인력, 설비, 인증에서 병목이 발생할 수 있습니다.", industry_impact: "병목 구간은 단기적으로 협상력을 갖고 산업 내 profit pool을 흡수합니다." },
@@ -736,7 +910,7 @@ function buildIndustryFallback({ industry, scope, period, reportType }) {
       ]
     },
     report_implications: {
-      core_conclusion: `${industry} 산업은 시장 규모 확대만으로 판단하기보다, 수요 성장의 이익이 어느 가치사슬 구간에 남는지를 중심으로 해석해야 합니다.`,
+      core_conclusion: `${displayIndustry} 산업은 시장 규모 확대만으로 판단하기보다, 수요 성장의 이익이 어느 가치사슬 구간에 남는지를 중심으로 해석해야 합니다.`,
       implications: [
         "산업 외형이 커져도 공급 과잉이 빠르게 발생하면 가격 하락과 마진 훼손이 동시에 나타날 수 있습니다.",
         "핵심 부품, 기술 인증, 고객 락인, 유통 접점처럼 대체가 어려운 구간은 산업 내 profit pool을 흡수할 가능성이 높습니다.",
@@ -750,7 +924,7 @@ function buildIndustryFallback({ industry, scope, period, reportType }) {
     },
     sources: [
       { title: "Local fallback industry structure", publisher: "BIT Analysis", url: "", used_for: "산업 구조와 밸류체인 기본 프레임" },
-      { title: "External research required", publisher: "증권사/통계/협회/정부 원문", url: "", used_for: "시장 규모와 성장률 수치 검증 필요" }
+      { title: industryContext.keywords.slice(0, 5).join(" / "), publisher: "검색 키워드", url: "", used_for: "상위 산업과 인접 세그먼트 탐색 기준" }
     ]
   };
 }
