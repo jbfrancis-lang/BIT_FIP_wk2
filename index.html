@@ -2340,8 +2340,9 @@
       els.sectionTwoTitle.textContent = "2. 밸류체인";
       els.sectionThreeTitle.textContent = "3. Revenue / Cost 구조와 핵심 변수";
       els.sectionFourTitle.textContent = "4. 시장 규모 및 산업적 시사점";
+      const marketUnit = marketTrendUnit(analysis.market_trend);
       els.graphOneTitle.textContent = "시장 규모 성장 추이";
-      els.graphOneCaption.textContent = analysis.market_trend.unit;
+      els.graphOneCaption.textContent = `단위: ${marketUnit}`;
       els.financialTable.classList.add("hidden");
       els.financialWrap.classList.add("hidden");
       els.valuationGrid.classList.add("hidden");
@@ -2391,6 +2392,7 @@
       if (graphInsight) {
         graphInsight.innerHTML = [
           `<div><b>성장 코멘트</b>${escapeHtml(analysis.market_trend.growth_comment)}</div>`,
+          `<div><b>그래프 단위</b>${escapeHtml(marketUnit)}</div>`,
           `<div><b>해석</b>${escapeHtml(analysis.market_trend.interpretation)}</div>`,
           `<div><b>데이터 주의</b>${escapeHtml(analysis.market_trend.data_quality_note)}</div>`
         ].join("");
@@ -3015,6 +3017,12 @@
 
     function seriesValues(series) {
       return Array.isArray(series) ? series.map(item => Number(item.value || 0)) : [0, 0, 0, 0, 0];
+    }
+
+    function marketTrendUnit(marketTrend) {
+      const unit = String(marketTrend && marketTrend.unit || "").trim();
+      if (!unit || /적정 단위|확인|미정|unknown|n\/a/i.test(unit)) return "시장 규모 추정치, 단위 검증 필요";
+      return unit;
     }
 
     function reportParagraphs(lines) {

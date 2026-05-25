@@ -274,7 +274,10 @@ async function generateIndustryAnalysis({ industry, scope, period, reportType })
       "Use both Korean and English keyword context when thinking about sparse categories, especially for consumer goods, IP goods, and niche manufacturing segments.",
       "Use an answer-first, causal, detailed Korean business-report tone.",
       "Market trend must be market-size level data, not an index like 100/120/80. Use a real unit such as '십억 달러', '조원', '백만 대', or another industry-appropriate unit.",
-      "Do not fabricate exact market sizes, stock returns, financial statements, or news dates. If exact data is uncertain, use broad estimated market-size figures, mark is_estimated true, and explain the uncertainty in data_quality_note and source_reference.",
+      "Do not fabricate exact market sizes, stock returns, financial statements, URLs, or news dates.",
+      "This request does not include live web-browsing evidence. Therefore market_trend.series must mark every point as is_estimated true unless the user supplied verified source data in the prompt.",
+      "If exact data is uncertain, use broad estimated market-size figures, explain the uncertainty in data_quality_note and source_reference, and write sources as source categories or source candidates rather than fake citations.",
+      "For sources, do not invent report titles or URLs. Use source candidate categories such as '통계청/산업통상자원부/협회 통계 검증 필요' or '글로벌 리서치 기관 검증 필요' and leave url empty when no specific verified URL was supplied.",
       "Keep the same report structure regardless of report type; 요약 Brief means compact but still substantive, not shallow.",
       "Return only valid JSON matching the requested schema."
     ].join("\n"),
@@ -361,6 +364,32 @@ function resolveIndustryContext(rawIndustry) {
     costDrivers
   });
   const rules = [
+    makeContext({
+      patterns: [/소비재/, /생활소비재/, /일반소비재/, /consumergoods/, /consumergoods/, /consumerstaples/, /fmcg/, /cpg/],
+      analysisIndustry: "소비재 및 FMCG",
+      parentIndustry: "식품, 생활용품, 퍼스널케어, 화장품, 패션잡화, 가정용품, 온라인/오프라인 유통 채널",
+      segments: ["식품/음료", "생활용품·퍼스널케어", "화장품·뷰티", "패션·잡화", "D2C/온라인 브랜드", "대형 유통·편의점·이커머스"],
+      keywords: ["소비재 산업", "FMCG 시장", "생활용품 시장", "consumer goods market", "FMCG market", "consumer staples", "CPG market", "retail consumer products"],
+      marketUnit: "국내 소비재 소매 판매액 추정치, 조원",
+      marketSeries: [490, 512, 545, 575, 603],
+      rationale: "소비재는 품목 범위가 넓어 단일 제품 시장으로 해석하면 답변이 흐려집니다. 따라서 식품, 생활용품, 퍼스널케어, 패션잡화, 유통 채널을 포함한 FMCG/소매 소비재 상위 시장으로 재정의해 분석합니다.",
+      valueChain: [
+        { stage: "Brand / Product Planning", participants: "브랜드사, ODM/OEM 기획팀, 카테고리 매니저, 상품기획 조직", role: "소비자 니즈, 가격대, 패키지, 브랜드 포지션을 제품으로 설계합니다.", revenue_model: "브랜드 제품 판매, PB/ODM 납품, 라이선스 상품 매출이 발생합니다.", cost_structure: "제품 개발비, 디자인·패키징, 샘플링, 브랜드 마케팅비가 주요 비용입니다.", margin_power: "강한 브랜드와 반복 구매 카테고리를 가진 사업자가 유통사보다 높은 가격 방어력을 확보합니다.", report_implication: "소비재의 profit pool은 단순 제조보다 브랜드, 카테고리 점유율, 반복 구매 빈도에 집중됩니다." },
+        { stage: "Manufacturing / Sourcing", participants: "원재료 공급자, OEM/ODM 제조사, 포장재 업체, 품질 인증 기관", role: "제품을 안정적으로 생산하고 원가, 품질, 납기, 규제 대응을 관리합니다.", revenue_model: "생산 단가, 장기 납품 계약, ODM 개발 생산에서 매출이 발생합니다.", cost_structure: "원재료, 포장재, 인건비, 에너지, 물류, 품질관리 비용이 핵심입니다.", margin_power: "레시피, 원료 조달, 인증, 소량 다품종 생산 역량이 있으면 단순 OEM보다 협상력이 올라갑니다.", report_implication: "원가 상승기에는 제조 경쟁력보다 브랜드의 가격 전가력과 유통 협상력이 수익성을 가릅니다." },
+        { stage: "Retail / Channel", participants: "대형마트, 편의점, 이커머스, H&B 스토어, 자사몰, 라이브커머스", role: "제품 노출, 프로모션, 가격, 재고 회전, 소비자 데이터 축적을 담당합니다.", revenue_model: "유통 마진, 입점 수수료, 광고 노출, PB 매출, 배송/멤버십 수익이 발생합니다.", cost_structure: "물류비, 재고 보관비, 판촉비, 수수료, 반품 비용이 부담입니다.", margin_power: "소비자 접점과 데이터를 가진 채널은 브랜드의 판매 조건과 프로모션 강도를 좌우합니다.", report_implication: "소비재에서는 브랜드와 채널의 협상력 변화가 매출보다 마진을 더 직접적으로 흔듭니다." },
+        { stage: "Consumer Demand", participants: "가계 소비자, MZ/시니어 세그먼트, 가격 민감 소비층, 프리미엄 소비층", role: "구매 빈도, 객단가, 브랜드 충성도, 가격 민감도를 통해 산업 수요를 결정합니다.", revenue_model: "반복 구매, 시즌성 구매, 프리미엄 업셀링, 구독/정기배송이 매출을 만듭니다.", cost_structure: "소비자 입장에서는 물가, 소득, 금리, 배송비, 프로모션 조건이 구매 결정 비용입니다.", margin_power: "필수재는 물량 방어가 좋고, 선택재는 브랜드·트렌드·소득 민감도가 큽니다.", report_implication: "소비재 분석은 총소비보다 필수재/선택재 믹스와 가격 전가 후 수요 이탈 여부를 분리해야 합니다." }
+      ],
+      revenueSources: [
+        { source: "Repeat Purchase", mechanism: "식품, 생활용품, 퍼스널케어처럼 구매 주기가 짧은 품목이 안정적 매출을 만듭니다.", sensitivity: "물가와 소득이 압박될 때도 필수재는 물량 방어가 가능하지만, 저가/프로모션 전환이 마진을 낮출 수 있습니다." },
+        { source: "Premium / Brand Mix", mechanism: "프리미엄 라인, 기능성 제품, 브랜드 충성도가 높은 카테고리에서 ASP와 마진이 올라갑니다.", sensitivity: "소비 심리가 약해지면 프리미엄 전환 속도가 둔화되고 중저가 PB와 경쟁이 커집니다." },
+        { source: "Channel Expansion", mechanism: "이커머스, 편의점, H&B, 자사몰, 라이브커머스가 신규 고객 접점과 반복 구매 데이터를 만듭니다.", sensitivity: "채널 수수료, 배송비, 광고비가 상승하면 매출 성장에도 영업 레버리지가 약해질 수 있습니다." }
+      ],
+      costDrivers: [
+        { cost: "Raw material / packaging", mechanism: "곡물, 유지, 화학 원료, 포장재, 환율이 제조 원가를 압박합니다.", risk: "브랜드가 가격을 올려도 소비자가 PB나 저가 대체재로 이동하면 마진 회복이 제한됩니다." },
+        { cost: "Promotion / channel fee", mechanism: "입점 수수료, 광고비, 판촉비, 라이브커머스 비용이 판매관리비를 구성합니다.", risk: "채널 의존도가 높으면 매출 성장을 위해 판촉비를 계속 써야 하는 구조가 됩니다." },
+        { cost: "Inventory / logistics", mechanism: "SKU 확장, 유통기한, 반품, 배송비가 재고와 물류 비용을 키웁니다.", risk: "수요 예측 실패 시 할인 판매와 재고평가손실이 동시에 발생합니다." }
+      ]
+    }),
     makeContext({
       patterns: [/인형/, /봉제완구/, /완구인형/, /plush/, /doll/, /stuffedtoy/, /키덜트/, /캐릭터굿즈/],
       analysisIndustry: "완구 및 캐릭터 IP 굿즈",
@@ -762,6 +791,7 @@ function extractResponseText(response) {
 function normalizeIndustryAnalysis(analysis, request) {
   const fallback = buildIndustryFallback(request);
   const isDeep = isDeepIndustryReport(request.reportType);
+  const normalizedMarketTrend = normalizeMarketTrend(analysis.market_trend, fallback.market_trend);
   const normalized = {
     ...fallback,
     ...analysis,
@@ -772,9 +802,7 @@ function normalizeIndustryAnalysis(analysis, request) {
       ...(analysis.industry_overview || {})
     },
     market_trend: {
-      ...fallback.market_trend,
-      ...(analysis.market_trend || {}),
-      series: normalizeMarketSeries(analysis.market_trend && analysis.market_trend.series, fallback.market_trend.series)
+      ...normalizedMarketTrend
     },
     value_chain: Array.isArray(analysis.value_chain) && analysis.value_chain.length ? analysis.value_chain : fallback.value_chain,
     revenue_cost_structure: {
@@ -786,7 +814,7 @@ function normalizeIndustryAnalysis(analysis, request) {
       ...fallback.report_implications,
       ...(analysis.report_implications || {})
     },
-    sources: Array.isArray(analysis.sources) && analysis.sources.length ? analysis.sources : fallback.sources
+    sources: normalizeIndustrySources(analysis.sources, fallback.sources)
   };
   if (isDeep) {
     normalized.deep_dive = {
@@ -804,6 +832,20 @@ function normalizeIndustryAnalysis(analysis, request) {
   return normalized;
 }
 
+function normalizeMarketTrend(trend, fallback) {
+  const unit = String(trend && trend.unit || "").trim();
+  const fallbackUnit = String(fallback && fallback.unit || "시장 규모 추정치, 단위 검증 필요").trim();
+  return {
+    ...fallback,
+    ...(trend || {}),
+    unit: unit && !/적정 단위|확인|미정|unknown|n\/a/i.test(unit) ? unit : fallbackUnit,
+    series: normalizeMarketSeries(trend && trend.series, fallback.series),
+    growth_comment: String(trend && trend.growth_comment || fallback.growth_comment || ""),
+    interpretation: String(trend && trend.interpretation || fallback.interpretation || ""),
+    data_quality_note: ensureEstimatedDataQualityNote(trend && trend.data_quality_note, fallback.data_quality_note)
+  };
+}
+
 function normalizeMarketSeries(series, fallback) {
   if (!Array.isArray(series) || series.length !== 5) return fallback;
   return series.map((item, index) => {
@@ -812,12 +854,51 @@ function normalizeMarketSeries(series, fallback) {
     return {
       year: String((item && item.year) || fallbackItem.year || ""),
       value: Number.isFinite(value) ? value : Number(fallbackItem.value || 0),
-      is_estimated: Boolean(item && item.is_estimated),
-      note: String((item && item.note) || fallbackItem.note || ""),
-      source_reference: String((item && item.source_reference) || fallbackItem.source_reference || "")
+      is_estimated: true,
+      note: ensureEstimatedNote((item && item.note) || fallbackItem.note || ""),
+      source_reference: ensureEstimatedSourceReference((item && item.source_reference) || fallbackItem.source_reference || "")
     };
   });
 }
+
+function ensureEstimatedNote(note) {
+  const text = String(note || "").trim();
+  if (!text) return "외부 원문 데이터 미연결 상태의 방향성 추정치";
+  if (/실제 집계|확정|공식 집계|verified/i.test(text)) return `${text} (서비스 내 원문 검증 전 추정치로 표시)`;
+  return text;
+}
+
+function ensureEstimatedSourceReference(reference) {
+  const text = String(reference || "").trim();
+  if (!text) return "원문 출처 검증 필요";
+  if (/local fallback|검증 필요|추정|candidate/i.test(text)) return text;
+  return `${text} 후보, 원문 검증 필요`;
+}
+
+function ensureEstimatedDataQualityNote(note, fallbackNote) {
+  const text = String(note || fallbackNote || "").trim();
+  const base = text || "정확한 시장 규모는 협회/정부 통계/리서치 원문으로 검증해야 합니다.";
+  return /추정|검증|원문|uncertain|estimate/i.test(base)
+    ? base
+    : `${base} 현재 값은 원문 데이터 미연결 상태의 추정치이므로 별도 검증이 필요합니다.`;
+}
+
+function normalizeIndustrySources(sources, fallbackSources) {
+  const rows = Array.isArray(sources) && sources.length ? sources : fallbackSources;
+  return rows.map(source => {
+    const title = String(source && source.title || "출처 후보").trim();
+    const publisher = String(source && source.publisher || "검증 필요").trim();
+    const usedFor = String(source && source.used_for || "시장 규모와 산업 구조 검증").trim();
+    const looksVerifiedUrl = source && typeof source.url === "string" && /^https?:\/\/[^/\s]+\/?$/.test(source.url.trim());
+    return {
+      title: /검증|후보|candidate/i.test(title) ? title : `${title} 후보`,
+      publisher: /검증|후보|candidate/i.test(publisher) ? publisher : `${publisher} 검증 필요`,
+      url: looksVerifiedUrl ? source.url.trim() : "",
+      used_for: /검증|추정|후보/i.test(usedFor) ? usedFor : `${usedFor} 검증`
+    };
+  }).slice(0, 5);
+}
+
 
 function normalizeSeries(series, fallback) {
   if (!Array.isArray(series) || series.length !== 5 || series.some(value => !Number.isFinite(Number(value)))) return fallback;
