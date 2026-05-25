@@ -250,13 +250,16 @@ async function generateIndustryAnalysis({ industry, scope, period, reportType })
   const payload = {
     model: openaiModel,
     instructions: [
-      "You are a Korean consulting research analyst writing the industry-analysis output for job seekers.",
+      "You are a Korean consulting research analyst writing a detailed industry analysis report.",
       "Analyze the industry only. Do not mix company analysis, DART disclosures, company revenue, EBIT, EBITDA, balance-sheet metrics, or valuation metrics.",
-      "Write outputs, not methodology. The user wants 'So what', not instructions about how to analyze.",
-      "Every field must contain substantive industry analysis: current situation, causal mechanism, value-chain power, revenue/cost logic, watch variables, and interview-ready implications.",
-      "Use an answer-first, causal, concise, practical Korean business tone.",
-      "Do not fabricate exact market sizes, stock returns, financial statements, or news dates. If a number is directional or estimated, mark is_estimated true and explain the source_reference cautiously.",
-      "Keep the same output structure regardless of report type; use report type only to control depth and density.",
+      "Write the actual report, not advice, instructions, interview coaching, resume coaching, or methodology.",
+      "Avoid vague guidance such as '봐야 합니다', '확인해야 합니다', '설명하면 좋습니다'. Instead state what is happening in the industry and why it matters.",
+      "Each long string field should be 2-4 complete Korean sentences with concrete sector context, not a one-line placeholder.",
+      "For value chain rows, write in plain business language. Do not use abstract phrases like '대체재가 적거나 병목을 가진 공급자' without naming the actual actor group or bottleneck type.",
+      "Use an answer-first, causal, detailed Korean business-report tone.",
+      "Market trend must be market-size level data, not an index like 100/120/80. Use a real unit such as '십억 달러', '조원', '백만 대', or another industry-appropriate unit.",
+      "Do not fabricate exact market sizes, stock returns, financial statements, or news dates. If exact data is uncertain, use broad estimated market-size figures, mark is_estimated true, and explain the uncertainty in data_quality_note and source_reference.",
+      "Keep the same report structure regardless of report type; '1 page brief' means compact but still substantive, not shallow.",
       "Return only valid JSON matching the requested schema."
     ].join("\n"),
     input: [
@@ -264,12 +267,12 @@ async function generateIndustryAnalysis({ industry, scope, period, reportType })
       `분석 범위: ${scope}`,
       `분석 기간: ${period}`,
       `리포트 유형: ${reportType}`,
-      "웹앱에 바로 렌더링할 수 있도록 다음 흐름을 지켜줘: 산업 개요, 시장 규모/성장 추이 graph, 밸류체인, Revenue/Cost 구조, 핵심 변수, 취준생용 So what.",
+      "웹앱에 바로 렌더링할 수 있도록 다음 흐름을 지켜줘: 산업 개요, 시장 규모/성장 추이 graph, 밸류체인, Revenue/Cost 구조, 핵심 변수, 산업적 시사점.",
       "나쁜 예: '수요 변화와 비용 구조를 함께 봐야 합니다.'",
-      "좋은 예: 'AI 반도체는 AI 서버 투자가 GPU에서 HBM·첨단패키징 병목으로 확산되며, 산업 이익은 최종 수요보다 공급 제약 구간에 집중되는 구조입니다.'",
-      "So what은 '면접에서 어떤 관점으로 말해야 하는가', '산업에서 돈이 남는 곳은 어디인가', '성장률보다 중요한 변수는 무엇인가'에 답해줘."
+      "좋은 예: '자동차 산업은 판매대수보다 파워트레인 믹스와 지역별 가격 정책이 수익성을 가르는 국면입니다. 미국과 유럽에서는 전기차 재고와 인센티브 부담이 커지는 반면, 하이브리드는 연비 수요와 낮은 보조금 의존도 때문에 완성차 업체의 마진 방어 수단으로 기능하고 있습니다.'",
+      "산업적 시사점은 '무엇을 해야 하는가'가 아니라 '이 산업은 어떤 구조로 움직이며, 어디서 이익과 리스크가 발생하는가'에 답해줘."
     ].join("\n"),
-    max_output_tokens: 4200,
+    max_output_tokens: 6500,
     text: {
       format: {
         type: "json_schema",
@@ -313,7 +316,7 @@ function industryAnalysisSchema() {
       "value_chain",
       "revenue_cost_structure",
       "key_variables",
-      "so_what",
+      "report_implications",
       "sources"
     ],
     properties: {
@@ -322,19 +325,21 @@ function industryAnalysisSchema() {
       industry_overview: {
         type: "object",
         additionalProperties: false,
-        required: ["definition", "why_it_matters", "current_phase", "key_demand_drivers", "key_supply_constraints"],
+        required: ["executive_summary", "definition", "market_scope", "current_state", "demand_side", "supply_side", "structural_change"],
         properties: {
+          executive_summary: { type: "string" },
           definition: { type: "string" },
-          why_it_matters: { type: "string" },
-          current_phase: { type: "string", enum: ["emerging", "growth", "mature", "declining", "mixed"] },
-          key_demand_drivers: { type: "array", minItems: 3, maxItems: 5, items: { type: "string" } },
-          key_supply_constraints: { type: "array", minItems: 3, maxItems: 5, items: { type: "string" } }
+          market_scope: { type: "string" },
+          current_state: { type: "string" },
+          demand_side: { type: "string" },
+          supply_side: { type: "string" },
+          structural_change: { type: "string" }
         }
       },
       market_trend: {
         type: "object",
         additionalProperties: false,
-        required: ["unit", "series", "interpretation"],
+        required: ["unit", "series", "growth_comment", "interpretation", "data_quality_note"],
         properties: {
           unit: { type: "string" },
           series: {
@@ -354,6 +359,8 @@ function industryAnalysisSchema() {
               }
             }
           },
+          growth_comment: { type: "string" },
+          data_quality_note: { type: "string" },
           interpretation: { type: "string" }
         }
       },
@@ -364,13 +371,15 @@ function industryAnalysisSchema() {
         items: {
           type: "object",
           additionalProperties: false,
-          required: ["stage", "role", "power_holder", "margin_logic", "so_what"],
+          required: ["stage", "participants", "role", "revenue_model", "cost_structure", "margin_power", "report_implication"],
           properties: {
             stage: { type: "string" },
+            participants: { type: "string" },
             role: { type: "string" },
-            power_holder: { type: "string" },
-            margin_logic: { type: "string" },
-            so_what: { type: "string" }
+            revenue_model: { type: "string" },
+            cost_structure: { type: "string" },
+            margin_power: { type: "string" },
+            report_implication: { type: "string" }
           }
         }
       },
@@ -419,25 +428,24 @@ function industryAnalysisSchema() {
         items: {
           type: "object",
           additionalProperties: false,
-          required: ["variable", "direction", "why_it_matters", "watch_metric"],
+          required: ["variable", "current_signal", "impact_on_industry", "affected_value_chain", "evidence_to_watch"],
           properties: {
             variable: { type: "string" },
-            direction: { type: "string", enum: ["positive", "negative", "mixed"] },
-            why_it_matters: { type: "string" },
-            watch_metric: { type: "string" }
+            current_signal: { type: "string" },
+            impact_on_industry: { type: "string" },
+            affected_value_chain: { type: "string" },
+            evidence_to_watch: { type: "string" }
           }
         }
       },
-      so_what: {
+      report_implications: {
         type: "object",
         additionalProperties: false,
-        required: ["one_line", "three_bullets", "interview_answer", "study_discussion_points", "resume_or_cover_letter_angle"],
+        required: ["core_conclusion", "implications", "discussion_points"],
         properties: {
-          one_line: { type: "string" },
-          three_bullets: { type: "array", minItems: 3, maxItems: 3, items: { type: "string" } },
-          interview_answer: { type: "string" },
-          study_discussion_points: { type: "array", minItems: 2, maxItems: 4, items: { type: "string" } },
-          resume_or_cover_letter_angle: { type: "string" }
+          core_conclusion: { type: "string" },
+          implications: { type: "array", minItems: 3, maxItems: 5, items: { type: "string" } },
+          discussion_points: { type: "array", minItems: 2, maxItems: 4, items: { type: "string" } }
         }
       },
       sources: {
@@ -493,9 +501,9 @@ function normalizeIndustryAnalysis(analysis, request) {
       ...(analysis.revenue_cost_structure || {})
     },
     key_variables: Array.isArray(analysis.key_variables) && analysis.key_variables.length ? analysis.key_variables : fallback.key_variables,
-    so_what: {
-      ...fallback.so_what,
-      ...(analysis.so_what || {})
+    report_implications: {
+      ...fallback.report_implications,
+      ...(analysis.report_implications || {})
     },
     sources: Array.isArray(analysis.sources) && analysis.sources.length ? analysis.sources : fallback.sources
   };
@@ -529,28 +537,32 @@ function buildIndustryFallback({ industry, scope, period, reportType }) {
     title: `${industry} 산업분석`,
     meta: ["산업분석", scope, period, reportType],
     industry_overview: {
-      definition: `${industry} 산업은 최종 수요, 공급망, 가격 결정 구조, 규제/정책 변화가 연결되어 움직이는 시장입니다.`,
-      why_it_matters: `${scope} 기준 ${industry} 산업의 핵심은 시장 성장 여부보다 성장의 이익이 어느 밸류체인 구간에 남는지입니다.`,
-      current_phase: "mixed",
-      key_demand_drivers: ["최종 수요 성장", "고객사 투자 사이클", "정책/규제 지원"],
-      key_supply_constraints: ["핵심 원재료/부품 병목", "CAPEX와 가동률 부담", "인력·기술·인허가 제약"]
+      executive_summary: `${industry} 산업은 최종 수요, 공급망, 가격 결정 구조, 규제 변화가 동시에 작동하는 시장입니다. 현재 로컬 fallback은 원문 리서치가 붙기 전의 구조화된 보고서 초안이며, OpenAI 생성이 성공하면 산업별 맥락을 더 구체화합니다.`,
+      definition: `${industry} 산업은 제품·서비스를 생산하는 사업자, 핵심 부품과 인프라 공급자, 유통·플랫폼, 최종 고객 수요가 연결된 가치사슬로 구성됩니다. 산업의 매력도는 시장 규모뿐 아니라 가격 결정권, 고정비 부담, 고객 락인, 규제 변화가 어떻게 결합되는지에 따라 달라집니다.`,
+      market_scope: `${scope} 범위에서는 내수 수요만이 아니라 글로벌 공급망, 주요 고객군의 투자 사이클, 정책·규제 환경까지 함께 반영해야 합니다. 특히 수출 비중이 높거나 핵심 부품을 해외에 의존하는 산업은 환율, 관세, 지정학 변수가 산업 수익성에 직접 영향을 줍니다.`,
+      current_state: `${period} 기준으로는 수요 성장과 비용 부담이 동시에 존재하는 혼재 국면입니다. 매출이 늘어나는 구간에서도 원가 상승, 과잉 증설, 경쟁 심화가 겹치면 산업 전체 이익률은 기대보다 낮게 형성될 수 있습니다.`,
+      demand_side: "수요는 최종 소비자의 구매력, 기업 고객의 CAPEX, 정책 지원, 교체 주기, 기술 전환에 의해 형성됩니다. 단기 수요가 강해도 장기 계약이나 반복 매출 구조가 약하면 산업의 실적 가시성은 낮아질 수 있습니다.",
+      supply_side: "공급 측면에서는 핵심 부품, 인력, 설비, 기술 인증, 물류, 에너지 비용이 병목으로 작동합니다. 공급 제약이 있는 구간은 가격 협상력을 얻지만, 증설이 빠르게 진행되면 같은 구간이 중기적으로 마진 압박 요인으로 바뀔 수 있습니다.",
+      structural_change: "구조적으로는 단순 물량 성장보다 고부가 제품 믹스, 플랫폼화, 장기계약, 운영 효율화가 산업 이익을 좌우하는 방향으로 이동하고 있습니다. 따라서 산업 분석은 시장 규모 확대와 함께 이익이 남는 가치사슬 구간을 분리해서 봐야 합니다."
     },
     market_trend: {
-      unit: "Index, 시작연도=100",
+      unit: "시장 규모 추정치, 산업별 적정 단위",
       series: years.map((year, index) => ({
         year,
-        value: [100, 112, 126, 143, 161][index],
+        value: [10, 11.2, 12.6, 14.3, 16.1][index],
         is_estimated: true,
-        note: "외부 원문 리서치 미연결 상태의 방향성 지수",
+        note: "외부 원문 리서치 미연결 상태의 시장 규모 방향성 추정",
         source_reference: "local fallback"
       })),
-      interpretation: `${period} 관점에서 ${industry} 산업은 수요 성장과 비용 부담이 동시에 커지며, 단순 시장 확대보다 이익이 남는 구간을 식별하는 것이 중요합니다.`
+      growth_comment: "로컬 fallback에서는 실제 외부 통계가 연결되어 있지 않아 절대값보다 성장 방향성만 제시합니다.",
+      data_quality_note: "정식 리포트에서는 협회 통계, 정부 통계, 증권사 리포트, 글로벌 리서치 기관 자료로 시장 규모 단위를 확정해야 합니다.",
+      interpretation: `${period} 관점에서 ${industry} 산업은 시장 규모가 커지는 흐름과 비용 부담이 함께 나타나는 구조입니다. 따라서 시장 확대가 곧바로 산업 수익성 개선으로 이어지는지, 아니면 특정 가치사슬 구간에만 이익이 집중되는지를 분리해 해석해야 합니다.`
     },
     value_chain: [
-      { stage: "Upstream", role: "원재료, 핵심 부품, 기술/IP, 설비를 공급합니다.", power_holder: "대체재가 적거나 병목을 가진 공급자", margin_logic: "공급 부족기에는 가격 전가력이 높아지고 장기계약이 마진을 방어합니다.", so_what: "취준생은 최종 제품보다 공급 병목이 어디인지 먼저 설명하면 산업 이해도가 선명해집니다." },
-      { stage: "Production / Operation", role: "제조, 운영, 품질, 수율, CAPEX 집행을 담당합니다.", power_holder: "수율·가동률·운영 효율을 안정화한 사업자", margin_logic: "고정비 비중이 높아 가동률 변화가 이익률에 크게 반영됩니다.", so_what: "성장 산업이어도 생산성이 낮으면 매출은 늘고 이익은 남지 않을 수 있습니다." },
-      { stage: "Channel / Platform", role: "유통, 플랫폼, B2B 고객 접점, 장기 계약을 만듭니다.", power_holder: "고객 락인과 데이터/채널을 보유한 사업자", margin_logic: "전환 비용이 높을수록 가격 인상과 반복 매출이 쉬워집니다.", so_what: "반복 매출과 고객 락인이 있는 구간은 업황 둔화에도 실적 가시성이 높습니다." },
-      { stage: "End Demand", role: "최종 소비자/기업 수요와 교체·투자 사이클을 결정합니다.", power_holder: "예산을 집행하는 핵심 고객군", margin_logic: "수요가 좋아도 가격 전가가 약하면 이익은 공급망 다른 구간에 남습니다.", so_what: "면접에서는 수요 성장만 말하기보다 그 수요가 가격과 마진으로 전환되는 경로를 말해야 합니다." }
+      { stage: "Upstream", participants: "원재료 공급자, 핵심 부품사, 기술/IP 보유 기업, 설비 업체", role: "산업 생산에 필요한 투입 요소와 기술 기반을 제공합니다. 이 구간의 공급 안정성이 낮으면 하위 단계의 생산량과 원가가 동시에 흔들립니다.", revenue_model: "장기 공급계약, 부품 판매, 기술 라이선스, 장비 판매에서 매출이 발생합니다.", cost_structure: "원재료 조달비, 연구개발비, 설비투자, 인증 비용이 주요 부담입니다.", margin_power: "대체 공급자가 적고 고객 인증 장벽이 높은 품목일수록 가격 협상력이 높습니다.", report_implication: "산업 수익성은 최종 수요보다 핵심 투입 요소의 공급 부족 여부에 먼저 반응할 수 있습니다." },
+      { stage: "Production / Operation", participants: "제조사, 운영사, 서비스 제공자, 품질·공정 관리 조직", role: "투입 요소를 제품이나 서비스로 전환하고 품질, 수율, 납기, 운영 효율을 관리합니다.", revenue_model: "제품 판매, 프로젝트 수주, 서비스 이용료, 생산량 기반 계약에서 매출이 발생합니다.", cost_structure: "감가상각, 인건비, 에너지 비용, 외주비, 품질보증비 등 고정비와 준고정비 부담이 큽니다.", margin_power: "가동률이 올라갈수록 고정비 흡수 효과가 커지지만, 수요 둔화기에는 손익 훼손이 빠르게 나타납니다.", report_implication: "생산 단계의 핵심은 성장률보다 수율, 가동률, 원가 전가력입니다." },
+      { stage: "Channel / Platform", participants: "유통사, 플랫폼, 대형 고객사, B2B 영업망, 애프터마켓 사업자", role: "제품과 서비스를 고객에게 전달하고 반복 구매, 유지보수, 데이터, 고객 관계를 축적합니다.", revenue_model: "유통 마진, 플랫폼 수수료, 구독료, 유지보수, 장기 계약 매출이 발생합니다.", cost_structure: "판매관리비, 물류비, 고객 획득 비용, 플랫폼 운영비가 주요 비용입니다.", margin_power: "고객 전환 비용이 높거나 유통 접점이 제한된 경우 채널 단계가 높은 협상력을 확보합니다.", report_implication: "채널을 장악한 기업은 제조 마진이 낮아져도 반복 매출과 고객 데이터를 통해 산업 내 이익을 방어할 수 있습니다." },
+      { stage: "End Demand", participants: "최종 소비자, 기업 고객, 정부·공공기관, 글로벌 바이어", role: "산업의 전체 수요 규모와 투자 사이클을 결정합니다.", revenue_model: "최종 구매, 교체 수요, 기업 투자, 공공 조달, 보조금 기반 수요에서 매출 기회가 발생합니다.", cost_structure: "최종 고객 단계에서는 가격 민감도, 금융비용, 규제 비용, 보조금 변화가 구매 결정을 좌우합니다.", margin_power: "수요가 강해도 최종 고객의 가격 민감도가 높으면 상위 밸류체인의 가격 인상 여지는 제한됩니다.", report_implication: "최종 수요 확대가 산업 전체의 이익 증가로 연결되려면 가격 인상과 비용 전가가 동시에 가능해야 합니다." }
     ],
     revenue_cost_structure: {
       revenue_sources: [
@@ -566,24 +578,23 @@ function buildIndustryFallback({ industry, scope, period, reportType }) {
       profit_pool_insight: `${industry} 산업의 profit pool은 최종 수요가 가장 큰 곳이 아니라, 공급 병목·고객 락인·가격 전가력을 가진 구간에 남습니다.`
     },
     key_variables: [
-      { variable: "최종 수요 성장", direction: "positive", why_it_matters: "산업의 외형 성장을 결정하지만 이익 배분을 단독으로 설명하지는 못합니다.", watch_metric: "시장 규모, 침투율, 고객사 CAPEX" },
-      { variable: "공급 병목과 증설 속도", direction: "mixed", why_it_matters: "병목은 단기 가격을 지지하지만 과잉 증설은 중기 마진을 훼손합니다.", watch_metric: "증설 계획, 리드타임, 가동률" },
-      { variable: "가격 전가력", direction: "positive", why_it_matters: "원가 상승기에도 마진을 지키는 핵심 조건입니다.", watch_metric: "ASP, 계약 구조, 가격 인상 성공 여부" },
-      { variable: "정책/규제", direction: "mixed", why_it_matters: "수요를 만들 수도 있고 비용과 진입장벽을 높일 수도 있습니다.", watch_metric: "보조금, 인허가, 규제 변경" }
+      { variable: "최종 수요 성장", current_signal: "수요 자체는 산업 외형을 지지하지만, 가격 경쟁이 심하면 수익성 개선은 제한될 수 있습니다.", impact_on_industry: "수요가 꾸준하면 가동률과 투자 명분은 좋아지지만, 공급 확대가 더 빠르면 마진은 압박받습니다.", affected_value_chain: "End Demand, Production / Operation", evidence_to_watch: "시장 규모, 침투율, 고객사 CAPEX, 재고 수준" },
+      { variable: "공급 병목과 증설 속도", current_signal: "단기 병목은 가격 협상력을 만들지만, 중기 증설이 집중되면 공급 과잉 리스크가 커집니다.", impact_on_industry: "병목 구간은 산업 이익을 흡수하고, 과잉 증설 구간은 가격 하락을 유발합니다.", affected_value_chain: "Upstream, Production / Operation", evidence_to_watch: "증설 계획, 리드타임, 가동률, 수주잔고" },
+      { variable: "가격 전가력", current_signal: "원가 변동이 큰 산업일수록 가격 전가 여부가 매출 성장보다 중요해집니다.", impact_on_industry: "가격 전가가 가능한 기업은 비용 상승기에도 마진을 방어하고, 그렇지 못한 기업은 외형 성장에도 이익이 줄어듭니다.", affected_value_chain: "Production / Operation, Channel / Platform", evidence_to_watch: "ASP, 계약 구조, 가격 인상 발표, 고객 이탈률" },
+      { variable: "정책/규제", current_signal: "정책은 수요를 앞당기거나 진입장벽을 높일 수 있지만, 동시에 비용과 불확실성도 만듭니다.", impact_on_industry: "보조금과 규제는 특정 기술·제품군의 성장 속도를 바꾸고, 기존 사업자의 투자 우선순위를 재배치합니다.", affected_value_chain: "전 밸류체인", evidence_to_watch: "보조금, 관세, 인허가, 환경·안전 규제 변경" }
     ],
-    so_what: {
-      one_line: `${industry} 산업은 성장률보다 밸류체인 내 협상력과 가격 전가력이 취준생이 말해야 할 핵심 포인트입니다.`,
-      three_bullets: [
-        "시장 성장 자체보다 이익이 어느 구간에 남는지 설명해야 합니다.",
-        "수혜/피해 구간은 공급 병목, 고객 락인, 원가 전가력으로 갈립니다.",
-        "면접에서는 최근 뉴스가 매출, 비용, 마진 중 어떤 변수로 연결되는지 말하는 편이 좋습니다."
+    report_implications: {
+      core_conclusion: `${industry} 산업은 시장 규모 확대만으로 판단하기보다, 수요 성장의 이익이 어느 가치사슬 구간에 남는지를 중심으로 해석해야 합니다.`,
+      implications: [
+        "산업 외형이 커져도 공급 과잉이 빠르게 발생하면 가격 하락과 마진 훼손이 동시에 나타날 수 있습니다.",
+        "핵심 부품, 기술 인증, 고객 락인, 유통 접점처럼 대체가 어려운 구간은 산업 내 profit pool을 흡수할 가능성이 높습니다.",
+        "비용 구조가 무거운 산업에서는 매출 증가보다 고정비 흡수, 가동률, 원가 전가력이 실적 방향성을 더 잘 설명합니다."
       ],
-      interview_answer: `${industry} 산업은 단순히 성장하는 산업이라기보다, 성장의 이익이 밸류체인 내 병목 구간에 집중되는 산업으로 이해하고 있습니다. 그래서 저는 시장 규모보다 공급 제약, 가격 전가력, 고객 락인 여부를 중심으로 산업 매력도를 판단합니다.`,
-      study_discussion_points: [
-        "이 산업에서 가장 협상력이 강한 밸류체인 구간은 어디인가?",
-        "최근 뉴스 하나가 매출, 비용, 마진 중 어디에 영향을 주는가?"
-      ],
-      resume_or_cover_letter_angle: `${industry} 산업을 수요 성장뿐 아니라 revenue/cost 구조와 밸류체인 협상력 관점에서 해석했다는 점을 지원 직무의 사업 이해도로 연결할 수 있습니다.`
+      discussion_points: [
+        "현재 산업 내 profit pool은 최종 제품, 핵심 부품, 채널, 서비스 중 어디에 집중되어 있는가?",
+        "최근 수요 확대가 가격 상승으로 이어지는가, 아니면 공급 증가로 흡수되는가?",
+        "정책·규제 변화가 수요 확대 요인인지 비용 증가 요인인지 구분할 수 있는가?"
+      ]
     },
     sources: [
       { title: "Local fallback industry structure", publisher: "BIT Analysis", url: "", used_for: "산업 구조와 밸류체인 기본 프레임" },
@@ -616,10 +627,12 @@ async function generateCompanyAnalysis({ financials, reportType }) {
     instructions: [
       "You are a Korean corporate study analyst building a one-company study sheet for BIT Analysis.",
       "Write company analysis outputs, not instructions, methodology, interview answers, or resume sentences.",
-      "The output should feel like an analyst-built Excel study sheet: Corporate Analysis, Investment Highlights, Risk Factors, DART financial insights, and graph-by-graph interpretation.",
-      "The user hates generic 'how to analyze' language. Do not say '확인해야 합니다' as a substitute for an insight. Give concrete business structure and concrete So What.",
+      "The output should feel like an analyst-built company study sheet: basic company identity first, business model second, DART financials third.",
+      "Do not expose reasoning steps, analysis process, checklist language, or phrases like '확인해야 합니다'. The user only wants finished insights.",
+      "Start with what the company does, what it mainly sells, who it serves, what value or strategy it claims, how it makes money, and only then connect the numbers.",
+      "The user hates generic 'how to analyze' language. Give concrete business structure and concrete So What.",
       "Use the DART financial packet and market data supplied by the app. Use your own company knowledge for business structure, but do not invent exact segment revenue percentages unless provided.",
-      "Investment Highlights means reasons to view the company positively for study purposes. It is not investment advice.",
+      "Business Highlights means reasons the company is competitively or structurally interesting for study purposes. It is not investment advice.",
       "For graphInsights, interpret the supplied five-year DART numbers: observed change, meaning, and So What.",
       "If a fact is uncertain, write it directionally and make the uncertainty explicit in sourceNote, not in every sentence.",
       "Return only valid JSON matching the requested schema."
@@ -674,6 +687,7 @@ function companyAnalysisSchema() {
     required: [
       "title",
       "meta",
+      "companyProfile",
       "companyOverview",
       "soWhatLead",
       "businessStructure",
@@ -688,6 +702,20 @@ function companyAnalysisSchema() {
     properties: {
       title: { type: "string" },
       meta: { type: "array", minItems: 3, maxItems: 6, items: { type: "string" } },
+      companyProfile: {
+        type: "object",
+        additionalProperties: false,
+        required: ["identity", "coreBusiness", "mainProducts", "customersAndChannels", "statedValue", "businessModel", "currentFocus"],
+        properties: {
+          identity: { type: "string" },
+          coreBusiness: { type: "string" },
+          mainProducts: { type: "string" },
+          customersAndChannels: { type: "string" },
+          statedValue: { type: "string" },
+          businessModel: { type: "string" },
+          currentFocus: { type: "string" }
+        }
+      },
       companyOverview: { type: "string" },
       soWhatLead: { type: "string" },
       businessStructure: {
@@ -777,6 +805,7 @@ function normalizeCompanyAnalysis(analysis, financials, reportType) {
     ...analysis,
     title: analysis.title || fallback.title,
     meta: Array.isArray(analysis.meta) && analysis.meta.length ? analysis.meta : fallback.meta,
+    companyProfile: analysis.companyProfile || fallback.companyProfile,
     businessStructure: normalizeArray(analysis.businessStructure, fallback.businessStructure),
     revenueCost: normalizeArray(analysis.revenueCost, fallback.revenueCost),
     financialSoWhat: normalizeArray(analysis.financialSoWhat, fallback.financialSoWhat),
@@ -809,8 +838,17 @@ function buildCompanyAnalysisFallback(financials, reportType) {
   return {
     title: `${name} 기업분석`,
     meta: ["기업분석", reportType, `${latest.year || ""} DART`, financials.quality && financials.quality.score ? `${financials.quality.score} quality` : "DART"],
-    companyOverview: `${name}은 DART상 확보된 5개년 재무에서 매출 ${formatWon(m.revenue)}, EBIT ${formatWon(m.operating_income)}, 영업현금흐름 ${formatWon(m.operating_cash_flow)}를 기록한 기업입니다. 현재 재무상으로는 외형 성장보다 EBIT margin과 현금전환력이 기업가치 판단의 중심에 있습니다.`,
-    soWhatLead: `핵심은 ${latest.year || "최신 연도"}년 EBIT margin ${formatPercent(opMargin)}, 순차입금 ${formatWon(m.net_debt)}, 현금흐름 패턴 ${pattern.type}입니다. 외형보다 이익률과 현금전환이 투자 여력과 밸류에이션을 설명합니다.`,
+    companyProfile: {
+      identity: `${name}은 상장 공시와 사업보고서를 기준으로 사업 구조와 재무 성과를 함께 읽어야 하는 분석 대상 기업입니다.`,
+      coreBusiness: "주요 사업은 회사가 반복적으로 매출을 만드는 제품/서비스군, 생산·운영 역량, 고객 기반으로 구성됩니다.",
+      mainProducts: "주요 제품과 서비스는 사업보고서의 사업부문 설명을 기준으로 보강됩니다.",
+      customersAndChannels: "고객과 채널은 B2B/B2C, 국내/해외, 직접 판매/유통 구조로 구분해 읽습니다.",
+      statedValue: "표방 가치는 회사가 IR, 사업보고서, 홈페이지에서 반복적으로 강조하는 기술, 품질, 고객, 지속가능성, 혁신 방향으로 정리됩니다.",
+      businessModel: `돈을 버는 방식은 매출 ${formatWon(m.revenue)}를 만드는 판매량·가격·제품 믹스와 EBIT margin ${formatPercent(opMargin)}를 만드는 비용 구조의 조합입니다.`,
+      currentFocus: `최근 초점은 외형보다 영업현금흐름 ${formatWon(m.operating_cash_flow)}와 순차입금 ${formatWon(m.net_debt)}가 보여주는 사업 체력입니다.`
+    },
+    companyOverview: `${name}은 먼저 '무엇을 팔고 누구에게 가치를 제공하는가'를 이해한 뒤, DART 숫자로 그 사업이 실제로 얼마나 돈을 벌고 있는지 연결해서 읽는 기업입니다. 최신 DART 기준 매출은 ${formatWon(m.revenue)}, EBIT는 ${formatWon(m.operating_income)}입니다.`,
+    soWhatLead: `${name}을 볼 때는 기업 정체성, 주력 제품/서비스, 고객 기반, 돈 버는 방식이 먼저이고, 재무는 그 사업 설명이 실제 성과로 이어졌는지 검증하는 근거입니다.`,
     businessStructure: [
       { segment: "핵심 제품/서비스", whatItDoes: "회사의 주력 매출을 만드는 제품과 서비스군", revenueLogic: "가격, 물량, 고객 믹스가 매출을 결정", marginLogic: "고정비 흡수와 제품 믹스가 EBIT margin을 결정", soWhat: "매출 성장만으로는 부족하고 고마진 제품 비중이 함께 올라가야 재평가됩니다." },
       { segment: "고객/채널", whatItDoes: "B2B/B2C 고객과 판매 채널", revenueLogic: "반복 고객과 장기 계약은 실적 가시성을 높임", marginLogic: "고객 집중도와 가격 전가력이 마진 방어력을 결정", soWhat: "고객 락인이 강할수록 업황 둔화에도 매출과 현금흐름이 덜 흔들립니다." },
@@ -831,14 +869,40 @@ function buildCompanyAnalysisFallback(financials, reportType) {
       { metric: "현금흐름 패턴", value: pattern.type, interpretation: pattern.description, soWhat: "영업/투자/재무 CF 조합이 회사의 현재 사이클 위치를 보여줍니다." }
     ],
     investmentHighlights: [
-      `EBIT margin ${formatPercent(opMargin)} 수준에서 본업 수익성 회복 여부가 핵심입니다.`,
-      `영업현금흐름 ${formatWon(m.operating_cash_flow)}가 투자와 재무활동 부담을 얼마나 흡수하는지가 관건입니다.`,
-      `순차입금 ${formatWon(m.net_debt)} 구조는 업황 둔화 시 방어력을 제공합니다.`
+      "주력 사업의 고객 기반과 제품 믹스가 명확할수록 매출의 반복성과 가격 전가력이 높아집니다.",
+      `최신 매출 ${formatWon(m.revenue)}와 EBIT ${formatWon(m.operating_income)}는 사업모델이 실제 손익으로 연결되는 정도를 보여줍니다.`,
+      `영업현금흐름 ${formatWon(m.operating_cash_flow)}는 회사가 벌어들인 이익을 실제 현금으로 전환하는 힘을 보여줍니다.`
     ],
     riskFactors: [
       "매출 성장과 이익률 개선이 분리될 경우 외형 성장에도 밸류에이션 확장이 제한됩니다.",
       "CAPEX 또는 운전자본 부담이 커지면 영업현금흐름이 약화될 수 있습니다.",
       "시장 기대가 이미 PER에 반영되어 있다면 실적 개선에도 주가 업사이드가 제한될 수 있습니다."
+    ],
+    graphInsights: [
+      {
+        title: "매출액 변화 추이",
+        observation: `최근 매출은 ${formatWon(m.revenue)}이고 5개년 누적 변화는 ${formatPercent(revenueGrowth)}입니다.`,
+        interpretation: "외형 성장만으로는 충분하지 않고 EBIT와 EBITDA가 같은 방향으로 개선되는지가 중요합니다.",
+        soWhat: "매출이 늘어도 이익률이 따라오지 않으면 성장의 질은 낮게 봐야 합니다."
+      },
+      {
+        title: "EBITDA 변화 추이",
+        observation: `최근 EBIT는 ${formatWon(m.operating_income)}, EBITDA는 ${formatWon(m.ebitda)}입니다.`,
+        interpretation: "EBITDA는 감가상각 부담을 제거한 현금성 영업 체력을 보여줍니다.",
+        soWhat: "EBITDA 회복은 CAPEX가 큰 기업이 다음 투자 사이클을 버틸 수 있는지 판단하는 핵심 신호입니다."
+      },
+      {
+        title: "영업현금흐름 변화 추이",
+        observation: `최근 영업현금흐름은 ${formatWon(m.operating_cash_flow)}이고 CFO/EBIT는 ${formatMultiple(cfoToOp)}입니다.`,
+        interpretation: "회계상 이익이 실제 현금으로 전환되는지가 이익의 질을 가릅니다.",
+        soWhat: "영업현금흐름이 강하면 투자, 차입 상환, 주주환원을 내부 현금으로 감당할 가능성이 높습니다."
+      },
+      {
+        title: "순차입금 변화 추이",
+        observation: `최근 순차입금은 ${formatWon(m.net_debt)}입니다.`,
+        interpretation: "순차입금은 현금 여력과 차입 부담을 동시에 보여주는 안정성 지표입니다.",
+        soWhat: "순현금 또는 낮은 순차입 구조는 업황 둔화와 투자 확대를 버티는 방어력입니다."
+      }
     ],
     onePageBrief: [
       `${name}: ${latest.year || "최신"}년 매출 ${formatWon(m.revenue)}, EBIT ${formatWon(m.operating_income)}.`,

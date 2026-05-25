@@ -529,6 +529,8 @@
       color: #344050;
       line-height: 1.8;
       margin: 0 0 12px;
+      word-break: keep-all;
+      overflow-wrap: anywhere;
     }
 
     .insight-box {
@@ -539,6 +541,42 @@
       color: #173c3a;
       line-height: 1.7;
       font-weight: 800;
+      word-break: keep-all;
+      overflow-wrap: anywhere;
+    }
+
+    .report-copy {
+      display: grid;
+      gap: 10px;
+    }
+
+    .report-copy p {
+      margin: 0;
+    }
+
+    .report-subgrid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+      margin-top: 12px;
+    }
+
+    .report-note {
+      border: 1px solid var(--line);
+      background: #fbfcfd;
+      border-radius: 6px;
+      padding: 12px;
+      line-height: 1.65;
+      color: #344050;
+      word-break: keep-all;
+      overflow-wrap: anywhere;
+    }
+
+    .report-note b {
+      display: block;
+      color: var(--blue);
+      margin-bottom: 5px;
+      font-size: 13px;
     }
 
     .data-table {
@@ -567,6 +605,10 @@
       grid-template-columns: repeat(2, minmax(0, 1fr));
       gap: 12px;
       margin: 14px 0;
+    }
+
+    .visual-grid.single {
+      grid-template-columns: 1fr;
     }
 
     .graph-card {
@@ -697,12 +739,18 @@
       margin-top: 12px;
     }
 
+    .chain-grid.report-chain {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
     .chain-card {
       border: 1px solid var(--line);
       background: #fbfcfd;
       border-radius: 6px;
       padding: 13px;
       line-height: 1.55;
+      word-break: keep-all;
+      overflow-wrap: anywhere;
     }
 
     .chain-card strong {
@@ -713,6 +761,14 @@
     .chain-card small {
       color: var(--sub);
       font-size: 13px;
+      display: grid;
+      gap: 7px;
+    }
+
+    .chain-card small b {
+      display: block;
+      color: #26323f;
+      margin-bottom: 2px;
     }
 
     .actions {
@@ -960,6 +1016,7 @@
 
       .output-system,
       .two-col,
+      .report-subgrid,
       .visual-grid,
       .company-summary-sheet,
       .chain-grid {
@@ -1236,7 +1293,7 @@
                   <h3 id="sectionThreeTitle">3. Revenue / Cost 구조</h3>
                   <table class="data-table">
                     <thead>
-                      <tr><th>구분</th><th>핵심 자료</th><th>So what</th></tr>
+                      <tr><th>구분</th><th>핵심 자료</th><th>해석</th></tr>
                     </thead>
                     <tbody id="revenueCostBody"></tbody>
                   </table>
@@ -1247,12 +1304,12 @@
                   <div class="visual-grid" id="graphGrid">
                     <div class="graph-card">
                       <h4 id="graphOneTitle">시장 규모 성장 추이</h4>
-                      <p id="graphOneCaption">시장규모 Index, 2021=100</p>
+                      <p id="graphOneCaption">시장 규모</p>
                       <div class="trend-graph" id="ebitdaChart"></div>
                     </div>
                     <div class="graph-card">
                       <h4 id="graphTwoTitle">수요 동인 변화</h4>
-                      <p id="graphTwoCaption">핵심 수요 강도 Index</p>
+                      <p id="graphTwoCaption">수요 변화</p>
                       <div class="trend-graph" id="cashFlowChart"></div>
                     </div>
                   </div>
@@ -1610,6 +1667,15 @@
         return {
           title: `${company} 기업분석`,
           meta: ["기업분석", els.reportType.value || "상세 분석", "사업구조 + DART"],
+          companyProfile: {
+            identity: `${company}은 사업 구조와 재무 성과를 함께 읽어야 하는 분석 대상 기업입니다.`,
+            coreBusiness: profile.chain[0] ? profile.chain[0][1] : "핵심 사업 확인 필요",
+            mainProducts: profile.chain[1] ? profile.chain[1][1] : "주요 제품/서비스 확인 필요",
+            customersAndChannels: profile.chain[2] ? profile.chain[2][1] : "고객/채널 확인 필요",
+            statedValue: "회사가 반복적으로 강조하는 기술, 고객, 품질, 지속가능성, 혁신 방향을 요약합니다.",
+            businessModel: profile.revenueCost[0] ? profile.revenueCost[0][1] : `매출 ${fin.revenue}를 만드는 가격, 물량, 제품 믹스 구조`,
+            currentFocus: profile.chainInsight.replace(/^So what:\s*/i, "")
+          },
           companyOverview: profile.overview,
           soWhatLead: profile.chainInsight.replace(/^So what:\s*/i, ""),
           businessStructure: profile.chain.map(([segment, body]) => ({
@@ -1638,6 +1704,15 @@
       return {
         title: `${company} 기업분석`,
         meta: ["기업분석", els.reportType.value || "상세 분석", "DART 기반"],
+        companyProfile: {
+          identity: `${company}은 기업 기본정보, 사업 구조, 재무 성과를 순서대로 읽어야 하는 분석 대상 기업입니다.`,
+          coreBusiness: "주요 사업은 사업보고서의 사업부문 설명을 기준으로 보강됩니다.",
+          mainProducts: "주요 제품/서비스는 공시 원문과 회사 IR 기준으로 정리됩니다.",
+          customersAndChannels: "고객/채널은 B2B/B2C, 국내/해외, 직접 판매/유통 구조로 구분합니다.",
+          statedValue: "표방 가치는 회사가 공식 자료에서 반복적으로 강조하는 전략 방향으로 정리합니다.",
+          businessModel: `매출 ${fin.revenue}를 만드는 판매량·가격·제품 믹스와 EBIT ${fin.ebit}를 만드는 비용 구조의 조합입니다.`,
+          currentFocus: `최근에는 영업현금흐름 ${fin.cfo}와 순차입금 ${fin.netDebt}가 사업 체력을 설명합니다.`
+        },
         companyOverview: `${company}의 최신 DART 재무는 매출 ${fin.revenue}, EBIT ${fin.ebit}, 영업현금흐름 ${fin.cfo}입니다. 현재 화면은 사업보고서 원문 또는 OpenAI 생성 전이므로, 사업부명은 확정하지 않고 재무에서 확인되는 수익성·현금흐름 중심으로 해석합니다.`,
         soWhatLead: `핵심은 매출보다 EBIT와 현금흐름입니다. ${company}의 EBIT ${fin.ebit}, 순차입금 ${fin.netDebt}, 영업현금흐름 ${fin.cfo}가 성장 투자 여력과 다운사이드 방어력을 설명합니다.`,
         businessStructure: [
@@ -1750,19 +1825,36 @@
     }
 
     function setDefaultGraphGrid() {
+      els.graphGrid.classList.remove("single");
       els.graphGrid.innerHTML = `
         <div class="graph-card">
           <h4 id="graphOneTitle">시장 규모 성장 추이</h4>
-          <p id="graphOneCaption">시장규모 Index, 2021=100</p>
+          <p id="graphOneCaption">시장 규모</p>
           <div class="trend-graph" id="ebitdaChart"></div>
         </div>
         <div class="graph-card">
           <h4 id="graphTwoTitle">수요 동인 변화</h4>
-          <p id="graphTwoCaption">핵심 수요 강도 Index</p>
+          <p id="graphTwoCaption">수요 변화</p>
           <div class="trend-graph" id="cashFlowChart"></div>
         </div>
       `;
       refreshGraphRefs();
+    }
+
+    function setIndustryGraphGrid() {
+      els.graphGrid.classList.add("single");
+      els.graphGrid.innerHTML = `
+        <div class="graph-card">
+          <h4 id="graphOneTitle">시장 규모 성장 추이</h4>
+          <p id="graphOneCaption">시장 규모</p>
+          <div class="trend-graph" id="ebitdaChart"></div>
+          <div class="graph-insight" id="marketGraphInsight"></div>
+        </div>
+      `;
+      refreshGraphRefs();
+      els.graphTwoTitle = null;
+      els.graphTwoCaption = null;
+      els.cashFlowChart = null;
     }
 
     function refreshGraphRefs() {
@@ -1775,6 +1867,7 @@
     }
 
     function setCompanyGraphGrid(graphs) {
+      els.graphGrid.classList.remove("single");
       els.graphGrid.innerHTML = graphs.map((graph, index) => `
         <div class="graph-card">
           <h4>${escapeHtml(graph.title)}</h4>
@@ -1814,29 +1907,35 @@
         title: `${data.name} 산업분석`,
         meta: ["산업분석", scope, period, reportType, "Local preview"],
         industry_overview: {
+          executive_summary: `${data.name} 산업은 최종 수요 성장과 비용 부담이 동시에 작동하는 시장입니다. 이 화면은 AI 생성 전 로컬 미리보기이므로 산업별 세부 수치는 제한적이지만, 보고서 구조는 실제 생성 결과와 동일하게 유지됩니다.`,
           definition: data.overview,
-          why_it_matters: data.overviewInsight.replace(/^So what:\s*/i, ""),
-          current_phase: "mixed",
-          key_demand_drivers: ["최종 수요 성장", "고객사 투자 사이클", "정책/규제 지원"],
-          key_supply_constraints: ["공급 병목", "CAPEX와 가동률 부담", "원가/환율 변동"]
+          market_scope: `${scope} 범위에서는 내수 수요, 글로벌 공급망, 주요 고객사의 투자 사이클, 정책 변화를 함께 반영해야 합니다.`,
+          current_state: `${period} 기준으로는 시장 확대와 비용 압력이 동시에 나타나는 혼재 국면입니다. 매출 확대가 곧바로 산업 이익 개선으로 이어지려면 가격 전가와 가동률 개선이 함께 필요합니다.`,
+          demand_side: "수요는 최종 소비자 구매력, 기업 고객의 투자 집행, 정책 지원, 기술 전환 속도에 의해 형성됩니다.",
+          supply_side: "공급은 핵심 부품, 설비, 인력, 물류, 인증 체계의 제약을 받습니다. 공급 병목이 있는 구간은 단기적으로 협상력이 높아질 수 있습니다.",
+          structural_change: "최근 산업 분석의 초점은 단순 시장 성장률보다 고부가 제품 믹스, 장기계약, 플랫폼화, 반복 매출 구조로 이동하고 있습니다."
         },
         market_trend: {
-          unit: "Index, 시작연도=100",
+          unit: "시장 규모 추정치",
           series: years.map((year, index) => ({
             year,
-            value: (data.marketSeries || [100, 110, 122, 136, 151])[index],
+            value: (data.marketSeries || [10, 11, 12.2, 13.6, 15.1])[index],
             is_estimated: true,
-            note: "로컬 미리보기 방향성 지수",
+            note: "로컬 미리보기 시장 규모 추정",
             source_reference: "local preview"
           })),
-          interpretation: `${scope} ${period} 관점에서 ${data.name} 산업은 시장 성장 자체보다 밸류체인 내 이익 배분과 비용 전가력이 더 중요한 해석 포인트입니다.`
+          growth_comment: "정식 AI 생성에서는 산업별 적정 단위와 성장률 설명이 채워집니다.",
+          data_quality_note: "로컬 미리보기 값은 외부 원문 검증 전 수치입니다.",
+          interpretation: `${scope} ${period} 관점에서 ${data.name} 산업은 시장 확대와 비용 부담이 동시에 나타나는 구조입니다. 시장 규모가 커져도 공급 과잉이나 가격 경쟁이 심하면 이익률 개선은 제한될 수 있습니다.`
         },
         value_chain: data.chain.map(([stage, detail]) => ({
           stage,
+          participants: detail,
           role: detail,
-          power_holder: "병목 자원, 고객 접점, 기술/IP 중 하나를 가진 사업자",
-          margin_logic: "협상력과 전환 비용이 높을수록 원가 상승기에도 마진을 방어합니다.",
-          so_what: "취준생은 이 구간이 왜 이익을 가져가는지 설명하면 산업 이해도가 선명하게 드러납니다."
+          revenue_model: "제품 판매, 서비스 이용료, 장기계약, 유지보수, 유통 마진 중 해당 산업에 맞는 방식으로 매출이 발생합니다.",
+          cost_structure: "원재료, 인건비, 설비투자, 물류비, 품질보증비가 주요 비용으로 작동합니다.",
+          margin_power: "고객 전환 비용이 높거나 공급 대체가 어려운 구간일수록 가격 협상력이 높습니다.",
+          report_implication: "이 단계가 산업 내 profit pool을 흡수하는지 여부가 밸류체인 분석의 핵심입니다."
         })),
         revenue_cost_structure: {
           revenue_sources: data.revenueCost.slice(0, 3).map(row => ({
@@ -1852,24 +1951,22 @@
           profit_pool_insight: `${data.name} 산업의 profit pool은 최종 수요가 가장 큰 곳이 아니라 공급 병목, 고객 락인, 가격 전가력을 가진 구간에 남습니다.`
         },
         key_variables: [
-          { variable: "최종 수요 성장", direction: "positive", why_it_matters: "산업의 외형 성장을 만들지만 이익 배분을 단독으로 설명하지는 못합니다.", watch_metric: "시장 규모, 침투율, 고객사 CAPEX" },
-          { variable: "공급 병목", direction: "mixed", why_it_matters: "단기 가격을 지지하지만 과잉 증설은 중기 마진을 훼손합니다.", watch_metric: "증설 계획, 리드타임, 가동률" },
-          { variable: "가격 전가력", direction: "positive", why_it_matters: "원가 상승기에도 마진을 지키는 핵심 조건입니다.", watch_metric: "ASP, 계약 구조, 가격 인상 성공 여부" },
-          { variable: "정책/규제", direction: "mixed", why_it_matters: "수요를 만들 수도 있고 비용과 진입장벽을 높일 수도 있습니다.", watch_metric: "보조금, 인허가, 규제 변경" }
+          { variable: "최종 수요 성장", current_signal: "시장 외형을 키우지만 이익률 개선을 단독으로 보장하지는 않습니다.", impact_on_industry: "수요가 강하면 가동률과 투자 명분이 좋아지지만 공급 확대가 더 빠르면 가격은 흔들릴 수 있습니다.", affected_value_chain: "End Demand, Production", evidence_to_watch: "시장 규모, 침투율, 고객사 CAPEX, 재고 수준" },
+          { variable: "공급 병목", current_signal: "단기 병목은 가격 협상력을 만들지만 중기 증설은 공급 과잉 리스크가 됩니다.", impact_on_industry: "병목 구간은 이익을 흡수하고 과잉 증설 구간은 가격 하락을 유발합니다.", affected_value_chain: "Upstream, Production", evidence_to_watch: "증설 계획, 리드타임, 가동률, 수주잔고" },
+          { variable: "가격 전가력", current_signal: "원가 변동이 큰 산업일수록 가격 전가 여부가 매출 성장보다 중요합니다.", impact_on_industry: "가격 전가가 가능한 기업은 비용 상승기에도 마진을 방어합니다.", affected_value_chain: "Production, Channel", evidence_to_watch: "ASP, 계약 구조, 가격 인상 성공 여부" },
+          { variable: "정책/규제", current_signal: "정책은 수요를 앞당기거나 비용과 진입장벽을 높일 수 있습니다.", impact_on_industry: "보조금과 규제는 특정 제품군의 성장 속도와 투자 우선순위를 바꿉니다.", affected_value_chain: "전 밸류체인", evidence_to_watch: "보조금, 관세, 인허가, 환경·안전 규제" }
         ],
-        so_what: {
-          one_line: `${data.name} 산업의 핵심은 시장 성장률이 아니라 성장의 이익이 어느 밸류체인 구간에 남는가입니다.`,
-          three_bullets: [
+        report_implications: {
+          core_conclusion: `${data.name} 산업은 시장 규모 확대보다 수요 성장의 이익이 어느 가치사슬 구간에 남는지를 중심으로 해석해야 합니다.`,
+          implications: [
             `${data.name} 산업의 핵심은 시장 성장률이 아니라 성장의 이익이 어느 밸류체인 구간에 남는가입니다.`,
             "수혜 기업과 피해 기업은 가격 전가력, 고정비 부담, 고객 락인에서 갈립니다.",
             "최근 이벤트가 실적으로 연결되는 경로를 설명하면 산업 이해도가 훨씬 선명하게 드러납니다."
           ],
-          interview_answer: `${data.name} 산업은 단순한 성장 산업이라기보다, 성장의 이익이 병목 구간과 고객 락인을 가진 구간에 집중되는 산업으로 이해하고 있습니다. 그래서 저는 시장 규모보다 가격 전가력과 밸류체인 협상력을 중심으로 봅니다.`,
-          study_discussion_points: [
+          discussion_points: [
             `${data.name} 산업에서 가장 가격 결정력이 강한 구간은 어디인가?`,
             "최근 뉴스 하나가 매출/비용/마진 중 어디에 영향을 주는가?"
-          ],
-          resume_or_cover_letter_angle: `${data.name} 산업을 수요 성장뿐 아니라 revenue/cost 구조와 밸류체인 협상력 관점에서 해석했다는 점을 지원 직무의 사업 이해도로 연결할 수 있습니다.`
+          ]
         },
         sources: [
           { title: "Local preview industry frame", publisher: "BIT Analysis", url: "", used_for: "산업 구조 미리보기" },
@@ -1933,15 +2030,13 @@
         : buildLocalIndustryAnalysis(data);
       const title = analysis.title || `${data.name} 산업분석`;
 
-      setDefaultGraphGrid();
+      setIndustryGraphGrid();
       els.sectionOneTitle.textContent = "1. 산업 개요";
       els.sectionTwoTitle.textContent = "2. 밸류체인";
-      els.sectionThreeTitle.textContent = "3. Revenue / Cost & 핵심 변수";
-      els.sectionFourTitle.textContent = "4. So What";
-      els.graphOneTitle.textContent = "시장 규모 / 성장 추이";
+      els.sectionThreeTitle.textContent = "3. Revenue / Cost 구조와 핵심 변수";
+      els.sectionFourTitle.textContent = "4. 시장 규모 및 산업적 시사점";
+      els.graphOneTitle.textContent = "시장 규모 성장 추이";
       els.graphOneCaption.textContent = analysis.market_trend.unit;
-      els.graphTwoTitle.textContent = "핵심 변수 방향성";
-      els.graphTwoCaption.textContent = "Positive=120, Mixed=100, Negative=80";
       els.financialTable.classList.add("hidden");
       els.financialWrap.classList.add("hidden");
       els.valuationGrid.classList.add("hidden");
@@ -1951,19 +2046,35 @@
       els.reportMeta.innerHTML = (analysis.meta || ["산업분석", els.scope.value, els.period.value, els.reportType.value])
         .map(item => `<span class="badge">${escapeHtml(item)}</span>`).join("");
       els.reportTitle.textContent = title;
-      els.overviewText.textContent = [
+      els.overviewText.innerHTML = reportParagraphs([
+        analysis.industry_overview.executive_summary,
         analysis.industry_overview.definition,
-        `왜 중요한가: ${analysis.industry_overview.why_it_matters}`,
-        `현재 국면: ${phaseLabel(analysis.industry_overview.current_phase)}`
-      ].join(" ");
-      els.overviewInsight.textContent = `수요 동인: ${analysis.industry_overview.key_demand_drivers.join(", ")} / 공급 제약: ${analysis.industry_overview.key_supply_constraints.join(", ")}`;
+        analysis.industry_overview.current_state
+      ]);
+      els.overviewInsight.innerHTML = reportNotes([
+        ["분석 범위", analysis.industry_overview.market_scope],
+        ["수요 측면", analysis.industry_overview.demand_side],
+        ["공급 측면", analysis.industry_overview.supply_side],
+        ["구조 변화", analysis.industry_overview.structural_change]
+      ]);
+      els.chainGrid.classList.add("report-chain");
       els.chainGrid.innerHTML = analysis.value_chain.map(item => `
-        <div class="chain-card"><strong>${escapeHtml(item.stage)}</strong><small>${escapeHtml(item.role)} · ${escapeHtml(item.power_holder)} · ${escapeHtml(item.so_what)}</small></div>
+        <div class="chain-card">
+          <strong>${escapeHtml(item.stage)}</strong>
+          <small>
+            <span><b>참여자</b>${escapeHtml(item.participants)}</span>
+            <span><b>역할</b>${escapeHtml(item.role)}</span>
+            <span><b>매출 구조</b>${escapeHtml(item.revenue_model)}</span>
+            <span><b>비용 구조</b>${escapeHtml(item.cost_structure)}</span>
+            <span><b>마진 결정력</b>${escapeHtml(item.margin_power)}</span>
+            <span><b>보고서 해석</b>${escapeHtml(item.report_implication)}</span>
+          </small>
+        </div>
       `).join("");
-      els.chainInsight.textContent = `시장 추이 해석: ${analysis.market_trend.interpretation}`;
+      els.chainInsight.textContent = analysis.revenue_cost_structure.profit_pool_insight;
       const revenueRows = analysis.revenue_cost_structure.revenue_sources.map(row => [`Revenue: ${row.source}`, row.mechanism, row.sensitivity]);
       const costRows = analysis.revenue_cost_structure.cost_drivers.map(row => [`Cost: ${row.cost}`, row.mechanism, row.risk]);
-      const variableRows = analysis.key_variables.map(row => [`Variable: ${row.variable}`, `${directionLabel(row.direction)} · ${row.why_it_matters}`, `Watch: ${row.watch_metric}`]);
+      const variableRows = analysis.key_variables.map(row => [`Variable: ${row.variable}`, `${row.current_signal} ${row.impact_on_industry}`, `영향 구간: ${row.affected_value_chain} / 근거: ${row.evidence_to_watch}`]);
       els.revenueCostBody.innerHTML = [...revenueRows, ...costRows, ...variableRows].map(row => `
         <tr><td><strong>${escapeHtml(row[0])}</strong></td><td>${escapeHtml(row[1])}</td><td>${escapeHtml(row[2])}</td></tr>
       `).join("");
@@ -1971,28 +2082,41 @@
         suffix: "",
         years: analysis.market_trend.series.map(item => item.year)
       });
-      renderTrendGraph(els.cashFlowChart, variableDirectionValues(analysis.key_variables), "핵심 변수", { suffix: "" });
-      const bullets = analysis.so_what.three_bullets.map(point => `• ${point}`).join(" ");
-      const discussions = analysis.so_what.study_discussion_points.map(question => `Q. ${question}`).join(" ");
-      els.financialInsight.textContent = `${analysis.so_what.one_line} ${bullets} 면접 답변: ${analysis.so_what.interview_answer} 스터디 질문: ${discussions} 자소서 각도: ${analysis.so_what.resume_or_cover_letter_angle}`;
+      const graphInsight = document.getElementById("marketGraphInsight");
+      if (graphInsight) {
+        graphInsight.innerHTML = [
+          `<div><b>성장 코멘트</b>${escapeHtml(analysis.market_trend.growth_comment)}</div>`,
+          `<div><b>해석</b>${escapeHtml(analysis.market_trend.interpretation)}</div>`,
+          `<div><b>데이터 주의</b>${escapeHtml(analysis.market_trend.data_quality_note)}</div>`
+        ].join("");
+      }
+      const implications = analysis.report_implications.implications.map(point => `• ${escapeHtml(point)}`).join("<br>");
+      const discussions = analysis.report_implications.discussion_points.map(question => `• ${escapeHtml(question)}`).join("<br>");
+      els.financialInsight.innerHTML = `<strong>${escapeHtml(analysis.report_implications.core_conclusion)}</strong><br>${implications}<br><br><b>Discussion Points</b><br>${discussions}`;
       els.sourceLine.textContent = `출처: ${sourceSummary(analysis.sources)}`;
       document.getElementById("downloadBtn").textContent = "리포트 내려받기";
       if (state.industryRequestKey !== getIndustryRequestKey()) {
-        els.dartStatus.textContent = "현재 화면은 로컬 미리보기입니다. 분석 생성을 누르면 AI가 산업 개요, 시장 추이, 밸류체인, Revenue/Cost, So what을 새로 작성합니다.";
+        els.dartStatus.textContent = "현재 화면은 로컬 미리보기입니다. 분석 생성을 누르면 AI가 산업 개요, 시장 규모, 밸류체인, Revenue/Cost, 핵심 변수, 산업적 시사점을 새로 작성합니다.";
       }
       state.markdown = buildIndustryMarkdown(title, analysis);
     }
 
     function buildCompanySummarySheet(data, fin) {
       const analysis = data.analysis;
-      const corporateBullets = [
-        analysis.companyOverview,
-        ...analysis.businessStructure.slice(0, 3).map(item => `${item.segment}: ${item.soWhat}`),
-        ...analysis.revenueCost.slice(0, 2).map(item => `${item.item}: ${item.mechanism} / ${item.soWhat}`),
-        `DART 핵심: 매출 ${fin.revenue}, EBIT ${fin.ebit}, EBITDA ${fin.ebitda}, 영업현금흐름 ${fin.cfo}, 순차입금 ${fin.netDebt}`
+      const profile = getCompanyProfile(analysis, data.company, fin);
+      const corporateRows = [
+        { label: "○ 기업 기본정보", className: "section-label" },
+        { label: `# 정체성: ${profile.identity}` },
+        { label: `# 핵심 사업: ${profile.coreBusiness}` },
+        { label: `# 주요 제품/서비스: ${profile.mainProducts}` },
+        { label: `# 고객/채널: ${profile.customersAndChannels}` },
+        { label: `# 표방 가치/전략: ${profile.statedValue}` },
+        { label: `# 돈 버는 방식: ${profile.businessModel}` },
+        { label: `# 최근 초점: ${profile.currentFocus}` },
+        { label: `# 재무 스냅샷: 매출 ${fin.revenue}, EBIT ${fin.ebit}, EBITDA ${fin.ebitda}` }
       ];
       const highlightBullets = [
-        { label: "○ Investment Highlights", className: "section-label" },
+        { label: "○ Business Highlights", className: "section-label" },
         ...analysis.investmentHighlights.map(text => ({ label: `# ${text}` })),
         { label: "○ Risk Factors", className: "section-label" },
         ...analysis.riskFactors.map(text => ({ label: `# ${text}` }))
@@ -2000,15 +2124,28 @@
       return `
         <div class="company-summary-sheet">
           <div class="sheet-panel">
-            <h4>Industry/Corporate Analysis</h4>
-            <ul class="sheet-list">${corporateBullets.map(text => `<li>${escapeHtml(text)}</li>`).join("")}</ul>
+            <h4>Company Profile / Corporate Analysis</h4>
+            <ul class="sheet-list">${corporateRows.map(item => `<li class="${item.className || ""}">${escapeHtml(item.label)}</li>`).join("")}</ul>
           </div>
           <div class="sheet-panel">
-            <h4>Investment Highlights / Risk Factors</h4>
+            <h4>Business Highlights / Risk Factors</h4>
             <ul class="sheet-list">${highlightBullets.map(item => `<li class="${item.className || ""}">${escapeHtml(item.label)}</li>`).join("")}</ul>
           </div>
         </div>
       `;
+    }
+
+    function getCompanyProfile(analysis, company, fin) {
+      const fallback = {
+        identity: `${company}은 사업 구조와 재무 성과를 함께 읽어야 하는 분석 대상 기업입니다.`,
+        coreBusiness: analysis.businessStructure && analysis.businessStructure[0] ? analysis.businessStructure[0].whatItDoes : "핵심 사업 확인 필요",
+        mainProducts: analysis.businessStructure && analysis.businessStructure[1] ? analysis.businessStructure[1].whatItDoes : "주요 제품/서비스 확인 필요",
+        customersAndChannels: analysis.businessStructure && analysis.businessStructure[2] ? analysis.businessStructure[2].whatItDoes : "고객/채널 확인 필요",
+        statedValue: "공식 자료에서 반복적으로 강조하는 기술, 고객, 품질, 지속가능성, 혁신 방향",
+        businessModel: `매출 ${fin.revenue}를 만드는 판매량·가격·제품 믹스와 EBIT ${fin.ebit}를 만드는 비용 구조`,
+        currentFocus: analysis.soWhatLead || "사업 구조가 실제 손익과 현금흐름으로 이어지는지"
+      };
+      return { ...fallback, ...(analysis.companyProfile || {}) };
     }
 
     function renderCompanyFinancialTable(data, fin) {
@@ -2129,12 +2266,14 @@
       const fin = data.financial;
       const title = `${data.company} 기업분석`;
       const detailed = els.reportType.value !== "1 page brief";
-      els.sectionOneTitle.textContent = "1. Corporate Analysis / Highlights & Risks";
-      els.sectionTwoTitle.textContent = "2. DART 5개년 핵심 재무";
+      const profile = getCompanyProfile(data.analysis, data.company, fin);
+      els.sectionOneTitle.textContent = "1. 기업 기본정보 & Business Highlights";
+      els.sectionTwoTitle.textContent = "2. 주요 사업과 돈 버는 방식";
       els.sectionThreeTitle.textContent = "3. 사업 포지션 & Revenue / Cost 구조";
-      els.sectionFourTitle.textContent = "4. DART Graph & Insight";
+      els.sectionFourTitle.textContent = "4. DART 재무 & Graph Insight";
       els.financialTable.classList.remove("hidden");
       els.financialWrap.classList.remove("hidden");
+      els.chainGrid.classList.remove("report-chain");
       document.getElementById("downloadBtn").textContent = fin.raw ? "엑셀 템플릿 내려받기" : "리포트 내려받기";
 
       els.reportMeta.innerHTML = ["기업분석", els.period.value, els.reportType.value]
@@ -2144,16 +2283,16 @@
       els.overviewText.innerHTML = buildCompanySummarySheet(data, fin);
       els.overviewInsight.textContent = `종합 So what: ${data.analysis.soWhatLead}`;
       els.chainGrid.innerHTML = [
-        ["매출액", fin.revenue, "외형 규모"],
-        ["EBIT", fin.ebit, "본업 수익성"],
-        ["EBITDA", fin.ebitda, "현금성 영업 체력"],
-        ["영업현금흐름", fin.cfo, "이익의 현금 전환"],
-        ["순차입금", fin.netDebt, "재무 안정성"],
-        ["PER / EV·EBITDA", `${fin.per || "확인 필요"} / ${fin.evEbitda || "확인 필요"}`, "시장 기대치"]
+        ["핵심 사업", profile.coreBusiness, "무엇으로 돈을 버는가"],
+        ["주요 제품/서비스", profile.mainProducts, "무엇을 파는가"],
+        ["고객/채널", profile.customersAndChannels, "누구에게 어떻게 파는가"],
+        ["표방 가치/전략", profile.statedValue, "회사가 강조하는 방향"],
+        ["사업모델", profile.businessModel, "매출과 이익이 만들어지는 방식"],
+        ["재무 스냅샷", `매출 ${fin.revenue} / EBIT ${fin.ebit}`, "사업 설명의 결과값"]
       ].map(([label, value, note]) => `
         <div class="chain-card"><strong>${escapeHtml(label)}</strong><small>${escapeHtml(value)} · ${escapeHtml(note)}</small></div>
       `).join("");
-      els.chainInsight.textContent = "DART 수치는 단순 요약값이 아니라 graph와 함께 읽어야 합니다. 매출, EBITDA, 영업현금흐름, 순차입금의 방향이 서로 같은지 보는 것이 핵심입니다.";
+      els.chainInsight.textContent = "기업분석은 회사가 무엇을 하고 어떤 가치를 내세우는지에서 시작합니다. 재무는 그 사업 설명이 실제 매출, 이익, 현금흐름으로 이어졌는지 확인하는 근거입니다.";
       const structureRows = data.analysis.businessStructure.map(item => [
         item.segment,
         `${item.whatItDoes} / ${item.revenueLogic}`,
@@ -2169,7 +2308,7 @@
       els.financialInsight.textContent = `So what: ${fin.insight}`;
       els.sourceLine.textContent = `출처: ${fin.source}`;
       els.dartStatus.textContent = fin.raw
-        ? `${data.company} DART 재무와 시장 데이터로 ${fin.raw.company_analysis_generated_by === "openai" ? "OpenAI 자체 분석" : "fallback 분석"}을 생성했습니다.`
+        ? `${data.company} 기업 기본정보, 사업 구조, DART 재무를 반영한 분석을 생성했습니다.`
         : fin.sampleKey
           ? `${data.company} 샘플 재무 인사이트가 표시되었습니다. 분석 생성을 누르면 OpenDART 최신 데이터로 갱신합니다.`
           : `${data.company}는 샘플 데이터셋에 없어 OpenDART corp code 매칭이 필요합니다.`;
@@ -2198,10 +2337,10 @@
 
       els.companyDetailGrid.classList.remove("hidden");
       els.companyDetailGrid.innerHTML = [
-        ["Investment Highlights", data.analysis.investmentHighlights],
+        ["Business Highlights", data.analysis.investmentHighlights],
         ["Risk Factors", data.analysis.riskFactors],
         ["1 Page Brief", data.analysis.onePageBrief],
-        ["Source Note", [data.analysis.sourceNote]]
+        ["Source", [data.analysis.sourceNote]]
       ].map(([title, lines]) => `
         <div class="detail-panel"><h4>${escapeHtml(title)}</h4><ul>${lines.map(line => `<li>${escapeHtml(line)}</li>`).join("")}</ul></div>
       `).join("");
@@ -2209,7 +2348,7 @@
       els.marketResearchPanel.classList.remove("hidden");
       const sources = fin.marketSources && fin.marketSources.length
         ? fin.marketSources.map(source => `${source.type}: ${source.name}${source.symbol ? ` (${source.symbol})` : ""}${source.basis ? ` / ${source.basis}` : ""}`)
-        : ["Naver Finance, KRX, 회사 IR 중 하나로 주가와 발행주식수를 확인해야 합니다."];
+        : ["Naver Finance, KRX, 회사 IR: 주가와 발행주식수 참고"];
       els.marketResearchPanel.innerHTML = `<strong>Market Data Sources</strong>${sources.map(escapeHtml).join("<br>")}`;
     }
 
@@ -2309,6 +2448,8 @@
     }
 
     function renderEmptyReport(message) {
+      setDefaultGraphGrid();
+      els.chainGrid.classList.remove("report-chain");
       els.reportMeta.innerHTML = "";
       els.reportTitle.textContent = "분석 대기 중";
       els.sectionOneTitle.textContent = "1. 입력을 완료하세요";
@@ -2341,19 +2482,25 @@
         `# ${title}`,
         "",
         "## 1. 산업 개요",
+        data.industry_overview.executive_summary,
+        "",
         data.industry_overview.definition,
-        `- 왜 중요한가: ${data.industry_overview.why_it_matters}`,
-        `- 현재 국면: ${phaseLabel(data.industry_overview.current_phase)}`,
-        `- 수요 동인: ${data.industry_overview.key_demand_drivers.join(", ")}`,
-        `- 공급 제약: ${data.industry_overview.key_supply_constraints.join(", ")}`,
+        "",
+        `- 분석 범위: ${data.industry_overview.market_scope}`,
+        `- 현재 국면: ${data.industry_overview.current_state}`,
+        `- 수요 측면: ${data.industry_overview.demand_side}`,
+        `- 공급 측면: ${data.industry_overview.supply_side}`,
+        `- 구조 변화: ${data.industry_overview.structural_change}`,
         "",
         "## 2. 시장 규모 및 성장 추이",
         `- 단위: ${data.market_trend.unit}`,
         ...data.market_trend.series.map(item => `- ${item.year}: ${item.value}${item.is_estimated ? " (estimated)" : ""} / ${item.note}`),
+        `- 성장 코멘트: ${data.market_trend.growth_comment}`,
         `- 해석: ${data.market_trend.interpretation}`,
+        `- 데이터 주의: ${data.market_trend.data_quality_note}`,
         "",
         "## 3. 밸류체인",
-        ...data.value_chain.map(item => `- ${item.stage}: ${item.role} / 협상력: ${item.power_holder} / 마진: ${item.margin_logic} → ${item.so_what}`),
+        ...data.value_chain.map(item => `- ${item.stage}: 참여자 ${item.participants} / 역할 ${item.role} / 매출 구조 ${item.revenue_model} / 비용 구조 ${item.cost_structure} / 마진 결정력 ${item.margin_power} / 해석 ${item.report_implication}`),
         "",
         "## 4. Revenue / Cost 구조",
         ...data.revenue_cost_structure.revenue_sources.map(row => `- Revenue | ${row.source}: ${row.mechanism} / 민감도: ${row.sensitivity}`),
@@ -2361,14 +2508,12 @@
         `- Profit pool: ${data.revenue_cost_structure.profit_pool_insight}`,
         "",
         "## 5. 핵심 변수",
-        ...data.key_variables.map(row => `- ${row.variable}: ${directionLabel(row.direction)} / ${row.why_it_matters} / Watch: ${row.watch_metric}`),
+        ...data.key_variables.map(row => `- ${row.variable}: ${row.current_signal} / 산업 영향: ${row.impact_on_industry} / 영향 구간: ${row.affected_value_chain} / 근거: ${row.evidence_to_watch}`),
         "",
-        "## 6. So What",
-        `- 한 줄 결론: ${data.so_what.one_line}`,
-        ...data.so_what.three_bullets.map(point => `- ${point}`),
-        `- 면접 답변: ${data.so_what.interview_answer}`,
-        `- 자소서 각도: ${data.so_what.resume_or_cover_letter_angle}`,
-        ...data.so_what.study_discussion_points.map(question => `- 스터디 질문: ${question}`),
+        "## 6. 산업적 시사점",
+        `- 핵심 결론: ${data.report_implications.core_conclusion}`,
+        ...data.report_implications.implications.map(point => `- ${point}`),
+        ...data.report_implications.discussion_points.map(question => `- Discussion: ${question}`),
         "",
         "## Sources",
         ...data.sources.map(source => `- ${source.publisher} | ${source.title}: ${source.used_for}${source.url ? ` (${source.url})` : ""}`)
@@ -2377,26 +2522,35 @@
 
     function buildCompanyMarkdown(title, data, fin) {
       const analysis = data.analysis;
+      const profile = getCompanyProfile(analysis, data.company, fin);
       return [
         `# ${title}`,
         "",
-        "## 1. 기업 개요",
+        "## 1. 기업 기본정보",
+        `- 정체성: ${profile.identity}`,
+        `- 핵심 사업: ${profile.coreBusiness}`,
+        `- 주요 제품/서비스: ${profile.mainProducts}`,
+        `- 고객/채널: ${profile.customersAndChannels}`,
+        `- 표방 가치/전략: ${profile.statedValue}`,
+        `- 돈 버는 방식: ${profile.businessModel}`,
+        "",
+        "## 2. 기업 개요",
         analysis.companyOverview,
         `So what: ${analysis.soWhatLead}`,
         "",
-        "## 2. 사업 구조",
+        "## 3. 사업 구조",
         ...analysis.businessStructure.map(item => `- ${item.segment}: ${item.whatItDoes} / 매출 구조: ${item.revenueLogic} / 마진 구조: ${item.marginLogic} → ${item.soWhat}`),
         "",
-        "## 3. Revenue / Cost 구조",
+        "## 4. Revenue / Cost 구조",
         ...analysis.revenueCost.map(row => `- ${row.item}: ${row.mechanism} → ${row.soWhat}`),
         "",
-        "## 4. DART 재무 인사이트",
+        "## 5. DART 재무 인사이트",
         `- 대상 기업: ${data.company}`,
         ...analysis.financialSoWhat.map(row => `- ${row.metric}: ${row.value} / ${row.interpretation} → ${row.soWhat}`),
         `- No. of Shares / Stock Price: ${fin.noOfShares || "리서치 필요"} / ${fin.stockPrice || "리서치 필요"}`,
         `- Market Cap / PER / EV·EBITDA: ${fin.marketCap || "확인 필요"} / ${fin.per || "확인 필요"} / ${fin.evEbitda || "확인 필요"}`,
         "",
-        "## Investment Highlights",
+        "## Business Highlights",
         ...analysis.investmentHighlights.map(item => `- ${item}`),
         "",
         "## Risk Factors",
@@ -2453,32 +2607,14 @@
       return Array.isArray(series) ? series.map(item => Number(item.value || 0)) : [0, 0, 0, 0, 0];
     }
 
-    function variableDirectionValues(variables) {
-      const values = (variables || []).slice(0, 5).map(item => {
-        if (item.direction === "positive") return 120;
-        if (item.direction === "negative") return 80;
-        return 100;
-      });
-      while (values.length < 5) values.push(100);
-      return values;
+    function reportParagraphs(lines) {
+      return `<div class="report-copy">${lines.filter(Boolean).map(line => `<p>${escapeHtml(line)}</p>`).join("")}</div>`;
     }
 
-    function phaseLabel(phase) {
-      return ({
-        emerging: "태동기",
-        growth: "성장기",
-        mature: "성숙기",
-        declining: "쇠퇴기",
-        mixed: "혼재"
-      })[phase] || phase || "혼재";
-    }
-
-    function directionLabel(direction) {
-      return ({
-        positive: "긍정",
-        negative: "부정",
-        mixed: "혼재"
-      })[direction] || direction || "혼재";
+    function reportNotes(rows) {
+      return `<div class="report-subgrid">${rows.filter(row => row[1]).map(([label, body]) => `
+        <div class="report-note"><b>${escapeHtml(label)}</b>${escapeHtml(body)}</div>
+      `).join("")}</div>`;
     }
 
     function sourceSummary(sources) {
