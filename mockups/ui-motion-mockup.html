@@ -1,0 +1,958 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>BIT Analysis Motion Mockup</title>
+  <link rel="icon" href="data:,">
+  <style>
+    :root {
+      --ink: #111417;
+      --muted: #5f6874;
+      --line: #dce5e9;
+      --paper: #fbfcf7;
+      --mint: #30c6b6;
+      --aqua: #5bbfd7;
+      --coral: #ef7564;
+      --amber: #f3b64b;
+      --green: #79b86c;
+      --panel: rgba(255, 255, 255, .88);
+      --shadow: 0 24px 80px rgba(20, 38, 53, .14);
+      --max: 1180px;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      margin: 0;
+      color: var(--ink);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background:
+        linear-gradient(120deg, rgba(48, 198, 182, .11), transparent 34%),
+        linear-gradient(220deg, rgba(239, 117, 100, .09), transparent 30%),
+        var(--paper);
+      letter-spacing: 0;
+      word-break: keep-all;
+      overflow-x: hidden;
+    }
+
+    a {
+      color: inherit;
+      text-decoration: none;
+    }
+
+    button,
+    input,
+    select {
+      font: inherit;
+      letter-spacing: 0;
+    }
+
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      border-bottom: 1px solid rgba(30, 48, 56, .12);
+      background: rgba(251, 252, 247, .82);
+      backdrop-filter: blur(18px);
+    }
+
+    .nav {
+      max-width: var(--max);
+      margin: 0 auto;
+      padding: 14px 22px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+    }
+
+    .brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 950;
+    }
+
+    .brand-mark {
+      position: relative;
+      width: 34px;
+      height: 14px;
+      border-radius: 2px;
+      background: linear-gradient(90deg, var(--mint), var(--aqua), var(--amber));
+      box-shadow: 0 10px 22px rgba(48, 198, 182, .36);
+      overflow: hidden;
+    }
+
+    .brand-mark::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      transform: translateX(-100%);
+      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, .72), transparent);
+      animation: sweep 2.8s ease-in-out infinite;
+    }
+
+    .nav-links {
+      display: flex;
+      gap: 20px;
+      color: var(--muted);
+      font-size: 14px;
+      font-weight: 800;
+    }
+
+    .pill-button {
+      min-height: 44px;
+      border: 1px solid rgba(17, 20, 23, .14);
+      border-radius: 7px;
+      padding: 11px 16px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      background: rgba(255, 255, 255, .9);
+      color: var(--ink);
+      font-weight: 900;
+      box-shadow: 0 10px 24px rgba(18, 33, 43, .08);
+    }
+
+    .pill-button.primary {
+      background: var(--ink);
+      color: #fff;
+      border-color: var(--ink);
+    }
+
+    .hero {
+      position: relative;
+      min-height: calc(100vh - 73px);
+      display: grid;
+      align-items: center;
+      overflow: hidden;
+    }
+
+    .hero::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(17, 20, 23, .06) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(17, 20, 23, .06) 1px, transparent 1px);
+      background-size: 52px 52px;
+      mask-image: linear-gradient(to bottom, rgba(0, 0, 0, .55), transparent 82%);
+      pointer-events: none;
+    }
+
+    .hero-inner {
+      position: relative;
+      max-width: var(--max);
+      width: 100%;
+      margin: 0 auto;
+      padding: 58px 22px 42px;
+      display: grid;
+      grid-template-columns: minmax(0, .9fr) minmax(460px, 1.1fr);
+      gap: 48px;
+      align-items: center;
+    }
+
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 9px;
+      margin-bottom: 18px;
+      color: #12766d;
+      font-size: 13px;
+      font-weight: 950;
+      text-transform: uppercase;
+    }
+
+    .eyebrow::before {
+      content: "";
+      width: 28px;
+      height: 4px;
+      border-radius: 999px;
+      background: var(--mint);
+    }
+
+    h1 {
+      margin: 0;
+      max-width: 710px;
+      font-size: clamp(44px, 6vw, 76px);
+      line-height: 1.02;
+      letter-spacing: 0;
+    }
+
+    .hero-copy {
+      margin: 22px 0 0;
+      max-width: 650px;
+      color: #3f4c54;
+      font-size: 19px;
+      line-height: 1.72;
+      font-weight: 650;
+    }
+
+    .hero-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-top: 30px;
+    }
+
+    .mini-metrics {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+      margin-top: 34px;
+      max-width: 660px;
+    }
+
+    .metric-tile {
+      border: 1px solid rgba(17, 20, 23, .1);
+      border-radius: 8px;
+      padding: 13px;
+      min-height: 96px;
+      background: rgba(255, 255, 255, .72);
+      box-shadow: 0 12px 32px rgba(27, 42, 48, .08);
+    }
+
+    .metric-tile span {
+      display: block;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 850;
+    }
+
+    .metric-tile strong {
+      display: block;
+      margin-top: 9px;
+      font-size: 22px;
+      line-height: 1.12;
+    }
+
+    .metric-tile i {
+      display: block;
+      height: 4px;
+      width: 100%;
+      margin-top: 15px;
+      border-radius: 99px;
+      background: linear-gradient(90deg, var(--mint), var(--amber), var(--coral));
+      transform-origin: left;
+      animation: grow 2.4s ease-in-out infinite;
+    }
+
+    .stage {
+      position: relative;
+      min-height: 620px;
+      perspective: 1400px;
+    }
+
+    .glass-board {
+      position: absolute;
+      inset: 0;
+      border: 1px solid rgba(22, 35, 42, .15);
+      border-radius: 18px;
+      background: rgba(255, 255, 255, .72);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(18px);
+      transform: rotateX(2deg) rotateY(-7deg);
+      overflow: hidden;
+    }
+
+    .glass-board::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(110deg, transparent 0 34%, rgba(255, 255, 255, .62) 46%, transparent 58%);
+      transform: translateX(-120%);
+      animation: sweep 4.8s ease-in-out infinite;
+      pointer-events: none;
+    }
+
+    .board-head {
+      height: 62px;
+      border-bottom: 1px solid rgba(17, 20, 23, .12);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 18px;
+      background: rgba(255, 255, 255, .62);
+    }
+
+    .traffic {
+      display: flex;
+      gap: 8px;
+    }
+
+    .traffic span {
+      width: 11px;
+      height: 11px;
+      border-radius: 50%;
+      background: var(--coral);
+    }
+
+    .traffic span:nth-child(2) {
+      background: var(--amber);
+    }
+
+    .traffic span:nth-child(3) {
+      background: var(--mint);
+    }
+
+    .board-title {
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 900;
+    }
+
+    .board-grid {
+      display: grid;
+      grid-template-columns: 245px minmax(0, 1fr);
+      gap: 16px;
+      padding: 18px;
+    }
+
+    .input-rail,
+    .report-view {
+      border: 1px solid rgba(17, 20, 23, .11);
+      border-radius: 12px;
+      background: rgba(255, 255, 255, .78);
+      min-height: 502px;
+    }
+
+    .input-rail {
+      padding: 14px;
+    }
+
+    .segmented {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+      padding: 5px;
+      border-radius: 8px;
+      background: #eef4f3;
+    }
+
+    .segmented span {
+      border-radius: 6px;
+      padding: 9px 7px;
+      text-align: center;
+      color: #536067;
+      font-size: 12px;
+      font-weight: 900;
+    }
+
+    .segmented .active {
+      background: #fff;
+      color: #0d7d73;
+      box-shadow: 0 8px 18px rgba(18, 35, 44, .08);
+    }
+
+    .mock-field {
+      margin-top: 14px;
+    }
+
+    .mock-field label {
+      display: block;
+      margin-bottom: 7px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 900;
+    }
+
+    .mock-input {
+      height: 43px;
+      border: 1px solid rgba(17, 20, 23, .13);
+      border-radius: 7px;
+      padding: 11px 12px;
+      background: #fff;
+      font-weight: 850;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .source-stack {
+      margin-top: 16px;
+      display: grid;
+      gap: 8px;
+    }
+
+    .source-row {
+      display: grid;
+      grid-template-columns: 22px 1fr;
+      gap: 8px;
+      align-items: center;
+      padding: 9px;
+      border-radius: 8px;
+      background: #f6faf8;
+      color: #405058;
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    .source-row b {
+      display: grid;
+      place-items: center;
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      color: #072b28;
+      background: var(--mint);
+      font-size: 11px;
+    }
+
+    .run-button {
+      margin-top: 16px;
+      height: 44px;
+      width: 100%;
+      border: 0;
+      border-radius: 7px;
+      color: #fff;
+      background: linear-gradient(90deg, #111417, #29414a);
+      font-weight: 950;
+      box-shadow: 0 18px 32px rgba(17, 20, 23, .2);
+    }
+
+    .report-view {
+      padding: 18px;
+      overflow: hidden;
+    }
+
+    .report-top {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 16px;
+      border-bottom: 1px solid rgba(17, 20, 23, .1);
+      padding-bottom: 15px;
+    }
+
+    .badge-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 7px;
+    }
+
+    .badge {
+      border-radius: 99px;
+      padding: 5px 9px;
+      background: #eef5f5;
+      color: #315058;
+      font-size: 11px;
+      font-weight: 900;
+    }
+
+    .report-view h2 {
+      margin: 11px 0 0;
+      font-size: 25px;
+      line-height: 1.18;
+      letter-spacing: 0;
+    }
+
+    .live-dot {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      color: #0d6d64;
+      font-size: 12px;
+      font-weight: 950;
+      white-space: nowrap;
+    }
+
+    .live-dot::before {
+      content: "";
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      background: var(--mint);
+      box-shadow: 0 0 0 0 rgba(48, 198, 182, .42);
+      animation: pulse 1.7s infinite;
+    }
+
+    .analysis-grid {
+      display: grid;
+      grid-template-columns: 1.05fr .95fr;
+      gap: 14px;
+      margin-top: 16px;
+    }
+
+    .insight-panel,
+    .chart-panel,
+    .chain-panel {
+      border: 1px solid rgba(17, 20, 23, .1);
+      border-radius: 10px;
+      background: rgba(255, 255, 255, .82);
+      padding: 14px;
+      min-height: 176px;
+    }
+
+    .panel-label {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 950;
+      text-transform: uppercase;
+    }
+
+    .insight-panel p {
+      margin: 12px 0 0;
+      color: #2a363d;
+      font-size: 14px;
+      line-height: 1.6;
+      font-weight: 700;
+    }
+
+    .chart {
+      position: relative;
+      height: 128px;
+      margin-top: 20px;
+      border-bottom: 1px solid var(--line);
+      border-left: 1px solid var(--line);
+    }
+
+    .chart-line {
+      position: absolute;
+      inset: 0 0 0 0;
+      background:
+        linear-gradient(120deg, transparent 0 13%, var(--mint) 13% 15%, transparent 15% 31%, var(--aqua) 31% 33%, transparent 33% 54%, var(--amber) 54% 56%, transparent 56% 75%, var(--coral) 75% 77%, transparent 77%);
+      clip-path: polygon(0 78%, 18% 64%, 38% 58%, 58% 38%, 78% 26%, 100% 12%, 100% 100%, 0 100%);
+      opacity: .35;
+      animation: chartFill 2.4s ease both;
+    }
+
+    .chart-path {
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: 18px;
+      height: 82px;
+      background: linear-gradient(90deg, var(--mint), var(--aqua), var(--amber), var(--coral));
+      clip-path: polygon(0 78%, 18% 64%, 38% 58%, 58% 38%, 78% 26%, 100% 12%, 100% 18%, 78% 32%, 58% 44%, 38% 64%, 18% 70%, 0 84%);
+      transform-origin: left;
+      animation: grow 2.2s ease both;
+    }
+
+    .chart-years {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 8px;
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 850;
+    }
+
+    .chain-panel {
+      grid-column: 1 / -1;
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .chain-step {
+      position: relative;
+      padding: 13px;
+      min-height: 114px;
+      border-radius: 9px;
+      background: #f6faf8;
+      overflow: hidden;
+    }
+
+    .chain-step::after {
+      content: "";
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      height: 4px;
+      background: linear-gradient(90deg, var(--mint), var(--amber));
+      transform: scaleX(.28);
+      transform-origin: left;
+      animation: stepProgress 3.5s ease-in-out infinite;
+    }
+
+    .chain-step strong {
+      display: block;
+      font-size: 13px;
+      margin-bottom: 8px;
+    }
+
+    .chain-step span {
+      color: #4a5960;
+      font-size: 12px;
+      line-height: 1.45;
+      font-weight: 700;
+    }
+
+    .floating-card {
+      position: absolute;
+      right: -18px;
+      bottom: 34px;
+      width: 278px;
+      border: 1px solid rgba(17, 20, 23, .11);
+      border-radius: 12px;
+      padding: 14px;
+      background: rgba(255, 255, 255, .94);
+      box-shadow: 0 18px 46px rgba(17, 20, 23, .16);
+      animation: floatCard 4.2s ease-in-out infinite;
+    }
+
+    .floating-card strong {
+      display: block;
+      font-size: 13px;
+    }
+
+    .floating-card p {
+      margin: 8px 0 0;
+      color: #46545c;
+      font-size: 12px;
+      line-height: 1.5;
+      font-weight: 760;
+    }
+
+    .bands {
+      border-top: 1px solid rgba(17, 20, 23, .09);
+      background: #fff;
+    }
+
+    .band-inner {
+      max-width: var(--max);
+      margin: 0 auto;
+      padding: 58px 22px;
+    }
+
+    .section-title {
+      display: flex;
+      justify-content: space-between;
+      gap: 30px;
+      align-items: end;
+      margin-bottom: 22px;
+    }
+
+    .section-title h2 {
+      margin: 0;
+      font-size: clamp(30px, 4vw, 46px);
+      letter-spacing: 0;
+    }
+
+    .section-title p {
+      max-width: 480px;
+      margin: 0;
+      color: var(--muted);
+      font-size: 16px;
+      line-height: 1.6;
+      font-weight: 700;
+    }
+
+    .motion-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 18px;
+      align-items: stretch;
+    }
+
+    .motion-panel {
+      border: 1px solid rgba(17, 20, 23, .1);
+      border-radius: 14px;
+      background: #fff;
+      min-height: 360px;
+      padding: 22px;
+      box-shadow: 0 18px 60px rgba(31, 43, 49, .09);
+      overflow: hidden;
+    }
+
+    .motion-panel img {
+      display: block;
+      width: 100%;
+      border: 1px solid rgba(17, 20, 23, .1);
+      border-radius: 10px;
+      margin-top: 16px;
+      transform: translateY(0);
+      animation: imageLift 5s ease-in-out infinite;
+    }
+
+    .timeline {
+      display: grid;
+      gap: 12px;
+      margin-top: 18px;
+    }
+
+    .timeline-row {
+      display: grid;
+      grid-template-columns: 38px 1fr auto;
+      gap: 12px;
+      align-items: center;
+      padding: 12px;
+      border-radius: 10px;
+      background: #f6faf8;
+    }
+
+    .timeline-row b {
+      display: grid;
+      place-items: center;
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      background: #fff;
+      color: #0b776f;
+      box-shadow: inset 0 0 0 1px rgba(48, 198, 182, .3);
+    }
+
+    .timeline-row span {
+      font-weight: 850;
+    }
+
+    .timeline-row small {
+      color: var(--muted);
+      font-weight: 850;
+    }
+
+    .footer {
+      padding: 26px 22px 40px;
+      color: var(--muted);
+      text-align: center;
+      font-size: 13px;
+      font-weight: 800;
+    }
+
+    @keyframes sweep {
+      0% { transform: translateX(-120%); }
+      58%, 100% { transform: translateX(120%); }
+    }
+
+    @keyframes grow {
+      from { transform: scaleX(.05); opacity: .48; }
+      to { transform: scaleX(1); opacity: 1; }
+    }
+
+    @keyframes pulse {
+      0% { box-shadow: 0 0 0 0 rgba(48, 198, 182, .45); }
+      70%, 100% { box-shadow: 0 0 0 12px rgba(48, 198, 182, 0); }
+    }
+
+    @keyframes chartFill {
+      from { clip-path: polygon(0 100%, 18% 100%, 38% 100%, 58% 100%, 78% 100%, 100% 100%, 100% 100%, 0 100%); }
+    }
+
+    @keyframes stepProgress {
+      0%, 100% { transform: scaleX(.18); }
+      50% { transform: scaleX(.86); }
+    }
+
+    @keyframes floatCard {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-10px); }
+    }
+
+    @keyframes imageLift {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-8px); }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *,
+      *::before,
+      *::after {
+        animation-duration: .01ms !important;
+        animation-iteration-count: 1 !important;
+        scroll-behavior: auto !important;
+      }
+    }
+
+    @media (max-width: 980px) {
+      .hero-inner,
+      .motion-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .stage {
+        min-height: 600px;
+      }
+
+      .glass-board {
+        transform: none;
+      }
+
+      .chain-panel,
+      .mini-metrics {
+        grid-template-columns: 1fr 1fr;
+      }
+    }
+
+    @media (max-width: 640px) {
+      .nav {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+
+      .nav-links {
+        flex-wrap: wrap;
+      }
+
+      .hero-inner {
+        padding-top: 42px;
+      }
+
+      .board-grid,
+      .analysis-grid,
+      .chain-panel,
+      .mini-metrics {
+        grid-template-columns: 1fr;
+      }
+
+      .stage {
+        min-height: 980px;
+      }
+
+      .floating-card {
+        position: static;
+        width: auto;
+        margin: 14px 18px 0;
+      }
+
+      .section-title {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <nav class="nav">
+      <a class="brand" href="#top"><span class="brand-mark"></span><span>BIT Analysis</span></a>
+      <div class="nav-links">
+        <a href="#workspace">Workspace</a>
+        <a href="#motion">Motion System</a>
+        <a href="../index.html">Current App</a>
+      </div>
+      <a class="pill-button primary" href="#workspace">서비스 이용해보기</a>
+    </nav>
+  </header>
+
+  <main id="top">
+    <section class="hero">
+      <div class="hero-inner">
+        <div>
+          <div class="eyebrow">Motion concept</div>
+          <h1>취준 리서치가<br>살아 움직이는<br>분석 워크스페이스</h1>
+          <p class="hero-copy">
+            산업과 기업을 입력하면 핵심 자료가 순서대로 조립되고, 시장 규모 graph와 DART 재무 흐름이 리포트 안에서 바로 읽히는 방향의 UI 목업입니다.
+          </p>
+          <div class="hero-actions">
+            <a class="pill-button primary" href="#workspace">워크스페이스 보기</a>
+            <a class="pill-button" href="#motion">모션 방향 보기</a>
+          </div>
+          <div class="mini-metrics">
+            <div class="metric-tile"><span>산업분석</span><strong>시장 구조<br>먼저</strong><i></i></div>
+            <div class="metric-tile"><span>기업분석</span><strong>DART 수치<br>중심</strong><i></i></div>
+            <div class="metric-tile"><span>출력물</span><strong>Brief<br>PDF</strong><i></i></div>
+          </div>
+        </div>
+
+        <div class="stage" id="workspace" aria-label="Animated workspace mockup">
+          <div class="glass-board">
+            <div class="board-head">
+              <div class="traffic"><span></span><span></span><span></span></div>
+              <div class="board-title">BIT Analysis Workspace</div>
+              <div class="live-dot">AI 생성 중</div>
+            </div>
+            <div class="board-grid">
+              <aside class="input-rail">
+                <div class="segmented"><span class="active">산업분석</span><span>기업분석</span></div>
+                <div class="mock-field">
+                  <label>분석 대상</label>
+                  <div class="mock-input"><span>소비재</span><span>국내</span></div>
+                </div>
+                <div class="mock-field">
+                  <label>기간 / 리포트</label>
+                  <div class="mock-input"><span>최근 5개년</span><span>요약 Brief</span></div>
+                </div>
+                <div class="source-stack">
+                  <div class="source-row"><b>1</b><span>상위 산업 범위 재정의</span></div>
+                  <div class="source-row"><b>2</b><span>시장 규모 단위 확정</span></div>
+                  <div class="source-row"><b>3</b><span>Revenue / Cost 구조화</span></div>
+                  <div class="source-row"><b>4</b><span>So what 리포트 작성</span></div>
+                </div>
+                <button class="run-button">분석 생성</button>
+              </aside>
+
+              <section class="report-view">
+                <div class="report-top">
+                  <div>
+                    <div class="badge-row">
+                      <span class="badge">산업분석</span>
+                      <span class="badge">FMCG</span>
+                      <span class="badge">단위: 조원</span>
+                    </div>
+                    <h2>국내 소비재 및 FMCG 산업 분석 리포트</h2>
+                  </div>
+                  <div class="live-dot">ready</div>
+                </div>
+
+                <div class="analysis-grid">
+                  <div class="insight-panel">
+                    <div class="panel-label">Analyst view</div>
+                    <p>
+                      소비재 산업은 총소비보다 필수재와 선택재 믹스, 브랜드 가격 전가력, 채널 수수료 부담이 수익성을 가르는 구간입니다.
+                    </p>
+                  </div>
+                  <div class="chart-panel">
+                    <div class="panel-label">시장 규모 성장 추이</div>
+                    <div class="chart">
+                      <div class="chart-line"></div>
+                      <div class="chart-path"></div>
+                    </div>
+                    <div class="chart-years"><span>2021</span><span>2022</span><span>2023</span><span>2024</span><span>2025</span></div>
+                  </div>
+                  <div class="chain-panel">
+                    <div class="chain-step"><strong>Brand</strong><span>카테고리 점유율과 반복 구매가 마진을 만듭니다.</span></div>
+                    <div class="chain-step"><strong>Manufacturing</strong><span>원재료와 포장재 비용이 가격 전가력을 시험합니다.</span></div>
+                    <div class="chain-step"><strong>Channel</strong><span>이커머스와 편의점 데이터가 판매 조건을 좌우합니다.</span></div>
+                    <div class="chain-step"><strong>Demand</strong><span>가계 물가 부담은 PB 전환과 프로모션 경쟁을 키웁니다.</span></div>
+                  </div>
+                </div>
+              </section>
+            </div>
+          </div>
+          <div class="floating-card">
+            <strong>So what</strong>
+            <p>시장 성장률보다 브랜드가 가격 인상 후에도 물량을 유지하는지가 핵심입니다. 채널 비용이 커지면 매출 성장에도 영업 레버리지는 약해집니다.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="bands" id="motion">
+      <div class="band-inner">
+        <div class="section-title">
+          <h2>이런 방향으로<br>UI를 키울 수 있어</h2>
+          <p>현재 기능을 바꾸지 않고도, 분석이 조립되는 느낌과 결과물이 생성되는 리듬을 더해 제품 완성도를 높이는 방향입니다.</p>
+        </div>
+        <div class="motion-grid">
+          <article class="motion-panel">
+            <div class="panel-label">Live report preview</div>
+            <div class="timeline">
+              <div class="timeline-row"><b>1</b><span>입력값 정규화</span><small>소비재 → FMCG</small></div>
+              <div class="timeline-row"><b>2</b><span>단위와 범위 고정</span><small>조원 / 국내</small></div>
+              <div class="timeline-row"><b>3</b><span>밸류체인 생성</span><small>Brand to Demand</small></div>
+              <div class="timeline-row"><b>4</b><span>PDF Brief 완성</span><small>So what 중심</small></div>
+            </div>
+          </article>
+          <article class="motion-panel">
+            <div class="panel-label">Current product as visual asset</div>
+            <img src="../qa-screenshots/render-deploy-check.png" alt="BIT Analysis deployed workspace screenshot">
+          </article>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    Local UI motion mockup only. Current production file remains unchanged.
+  </footer>
+</body>
+</html>
