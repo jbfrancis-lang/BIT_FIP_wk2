@@ -1778,7 +1778,7 @@
       els.dartStatus.textContent = mode === "industry"
         ? "산업분석은 기업 DART 재무를 사용하지 않습니다. 산업 구조와 시장 흐름만 독립적으로 정리합니다."
         : "기업명을 입력하고 분석 생성을 누르면 OpenDART 5개년 재무와 발행주식수/주가 보완값을 함께 조회합니다.";
-      document.getElementById("downloadBtn").textContent = mode === "company" ? "엑셀 내려받기" : "PDF 내려받기";
+      document.getElementById("downloadBtn").textContent = "PDF 내려받기";
       renderReport();
     }
 
@@ -2648,7 +2648,7 @@
       els.financialTable.classList.remove("hidden");
       els.financialWrap.classList.remove("hidden");
       els.chainGrid.classList.remove("report-chain");
-      document.getElementById("downloadBtn").textContent = "엑셀 내려받기";
+      document.getElementById("downloadBtn").textContent = "PDF 내려받기";
 
       els.reportMeta.innerHTML = ["기업분석", els.period.value, els.reportType.value]
         .concat(fin.raw ? [`DART ${fin.latestYear}`, "시장 데이터 보완"] : ["샘플/연동 대기"])
@@ -3094,10 +3094,6 @@
     }
 
     async function downloadReport() {
-      if (state.mode === "company" && state.companyFinancials && state.selectedCompany?.match?.corp_code) {
-        await downloadCompanyWorkbook();
-        return;
-      }
       if (!state.markdown) {
         showToast("먼저 분석을 생성하거나 입력값을 채워주세요.");
         return;
@@ -3117,28 +3113,6 @@
         window.print();
         window.setTimeout(cleanup, 1200);
       }, 80);
-    }
-
-    function downloadCompanyWorkbook() {
-      const raw = state.companyFinancials;
-      const match = state.selectedCompany.match;
-      const request = raw.request || {};
-      const params = new URLSearchParams({
-        corp_code: match.corp_code,
-        bsns_year: String(request.base_year || els.baseYear.value || new Date().getFullYear() - 1),
-        years: String(request.years || (els.period.value.includes("3") ? 3 : 5)),
-        report_code: request.report_code || "11011",
-        fs_div: request.fs_div || "CFS"
-      });
-      const link = document.createElement("a");
-      const company = (raw.company?.name || match.name || els.companyName.value || "기업분석").replace(/[\\/:*?"<>|]/g, "");
-      link.href = apiUrl(`/api/export/company-workbook?${params.toString()}`);
-      link.download = `${company}_기업분석.xlsx`;
-      link.rel = "noopener";
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      showToast("브라우저 다운로드 목록을 확인해주세요.");
     }
 
     function showToast(message) {
