@@ -1176,6 +1176,81 @@
         min-width: 600px;
       }
     }
+
+    @media print {
+      @page {
+        size: A4;
+        margin: 14mm;
+      }
+
+      body.print-report {
+        background: #fff;
+        color: #111827;
+      }
+
+      body.print-report .topbar,
+      body.print-report #landing,
+      body.print-report .workspace-head,
+      body.print-report .app-top,
+      body.print-report .input-panel,
+      body.print-report .actions,
+      body.print-report .toast,
+      body.print-report .loading-screen {
+        display: none !important;
+      }
+
+      body.print-report #workspace,
+      body.print-report .workspace-wrap,
+      body.print-report .workspace,
+      body.print-report .app,
+      body.print-report .app-grid,
+      body.print-report .result-panel,
+      body.print-report .report-shell {
+        display: block !important;
+        min-height: 0 !important;
+        width: 100% !important;
+        max-width: none !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        border: 0 !important;
+        border-radius: 0 !important;
+        background: #fff !important;
+        box-shadow: none !important;
+        color: #111827 !important;
+        overflow: visible !important;
+      }
+
+      body.print-report .report-meta,
+      body.print-report .report-section,
+      body.print-report .graph-card,
+      body.print-report .chain-card,
+      body.print-report .detail-panel,
+      body.print-report .research-panel,
+      body.print-report .insight-box {
+        break-inside: avoid;
+        page-break-inside: avoid;
+      }
+
+      body.print-report .report-title {
+        font-size: 28px;
+        color: #111827;
+      }
+
+      body.print-report .report-section h3,
+      body.print-report .graph-card h4,
+      body.print-report .detail-panel h4 {
+        color: #0b4d78;
+      }
+
+      body.print-report .financial-scroll {
+        overflow: visible !important;
+        border: 0;
+      }
+
+      body.print-report .financial-scroll .data-table {
+        min-width: 0;
+      }
+    }
   </style>
 </head>
 <body>
@@ -2230,7 +2305,7 @@
         els.marketResearchPanel.classList.add("hidden");
         els.marketResearchPanel.innerHTML = "";
       }
-      document.getElementById("downloadBtn").textContent = "리포트 내려받기";
+      document.getElementById("downloadBtn").textContent = "PDF 내려받기";
       if (state.industryRequestKey !== getIndustryRequestKey()) {
         els.dartStatus.textContent = "현재 화면은 로컬 미리보기입니다. 분석 생성을 누르면 AI가 산업 개요, 시장 규모, 밸류체인, Revenue/Cost, 핵심 변수, 산업적 시사점을 새로 작성합니다.";
       }
@@ -2458,7 +2533,7 @@
       els.financialTable.classList.remove("hidden");
       els.financialWrap.classList.remove("hidden");
       els.chainGrid.classList.remove("report-chain");
-      document.getElementById("downloadBtn").textContent = fin.raw ? "엑셀 템플릿 내려받기" : "리포트 내려받기";
+      document.getElementById("downloadBtn").textContent = "PDF 내려받기";
 
       els.reportMeta.innerHTML = ["기업분석", els.period.value, els.reportType.value]
         .concat(fin.raw ? [`DART ${fin.latestYear}`, "시장 데이터 보완"] : ["샘플/연동 대기"])
@@ -2888,27 +2963,25 @@
     }
 
     function downloadReport() {
-      if (state.mode === "company" && state.companyFinancials && state.companyFinancials.request) {
-        const req = state.companyFinancials.request;
-        const params = new URLSearchParams({
-          corp_code: req.corp_code,
-          bsns_year: String(req.base_year),
-          years: String(req.years),
-          report_code: req.report_code,
-          fs_div: req.fs_div
-        });
-        window.location.href = apiUrl(`/api/export/company-workbook?${params.toString()}`);
+      if (!state.markdown) {
+        showToast("먼저 분석을 생성하거나 입력값을 채워주세요.");
         return;
       }
-      const blob = new Blob([state.markdown], { type: "text/markdown;charset=utf-8" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = "bit-analysis-report.md";
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
+      const previousTitle = document.title;
+      const reportTitle = (els.reportTitle.textContent || "BIT Analysis Report").trim();
+      document.title = `${reportTitle} - BIT Analysis`;
+      document.body.classList.add("print-report");
+      const cleanup = () => {
+        document.body.classList.remove("print-report");
+        document.title = previousTitle;
+        window.removeEventListener("afterprint", cleanup);
+      };
+      window.addEventListener("afterprint", cleanup);
+      showToast("인쇄 창에서 PDF로 저장을 선택하면 전체 리포트를 내려받을 수 있습니다.");
+      window.setTimeout(() => {
+        window.print();
+        window.setTimeout(cleanup, 1200);
+      }, 80);
     }
 
     function showToast(message) {
