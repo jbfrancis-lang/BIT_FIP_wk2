@@ -2839,7 +2839,16 @@
       const current = els.reportType.value || options[0];
       const currentIndex = Math.max(options.indexOf(current), 0);
       const next = options[(currentIndex + 1) % options.length];
-      document.getElementById("briefToggleBtn").textContent = `${next}로 보기`;
+      document.getElementById("briefToggleBtn").textContent = `${next}${koreanParticle(next, "으로", "로")} 보기`;
+    }
+
+    function koreanParticle(text, consonantParticle, vowelParticle) {
+      const stripped = String(text || "").trim().replace(/\s+/g, "");
+      const last = stripped.charCodeAt(stripped.length - 1);
+      if (last < 0xac00 || last > 0xd7a3) return vowelParticle;
+      const hasFinalConsonant = (last - 0xac00) % 28 !== 0;
+      const isRieulFinal = (last - 0xac00) % 28 === 8;
+      return hasFinalConsonant && !isRieulFinal ? consonantParticle : vowelParticle;
     }
 
     function toTrillion(value) {
