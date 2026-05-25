@@ -247,6 +247,7 @@ async function fetchWithTimeout(url, options = {}, timeoutMs = 10000) {
 }
 
 async function generateIndustryAnalysis({ industry, scope, period, reportType }) {
+  const isDeep = isDeepIndustryReport(reportType);
   const payload = {
     model: openaiModel,
     instructions: [
@@ -259,7 +260,7 @@ async function generateIndustryAnalysis({ industry, scope, period, reportType })
       "Use an answer-first, causal, detailed Korean business-report tone.",
       "Market trend must be market-size level data, not an index like 100/120/80. Use a real unit such as '십억 달러', '조원', '백만 대', or another industry-appropriate unit.",
       "Do not fabricate exact market sizes, stock returns, financial statements, or news dates. If exact data is uncertain, use broad estimated market-size figures, mark is_estimated true, and explain the uncertainty in data_quality_note and source_reference.",
-      "Keep the same report structure regardless of report type; '1 page brief' means compact but still substantive, not shallow.",
+      "Keep the same report structure regardless of report type; 요약 Brief means compact but still substantive, not shallow.",
       "Return only valid JSON matching the requested schema."
     ].join("\n"),
     input: [
@@ -268,17 +269,20 @@ async function generateIndustryAnalysis({ industry, scope, period, reportType })
       `분석 기간: ${period}`,
       `리포트 유형: ${reportType}`,
       "웹앱에 바로 렌더링할 수 있도록 다음 흐름을 지켜줘: 산업 개요, 시장 규모/성장 추이 graph, 밸류체인, Revenue/Cost 구조, 핵심 변수, 산업적 시사점.",
+      isDeep
+        ? "이번 요청은 '심층 분석'이다. 증권사 산업 리포트처럼 핵심 결론, 주요 이슈 플로우, 세부 섹터별 판단, 추적 지표, 시나리오, 리스크를 deep_dive에 충분한 분량으로 작성해줘."
+        : "이번 요청은 기본 리포트다. deep_dive는 생성하지 말고 기본 산출물 필드만 충실하게 작성해줘.",
       "나쁜 예: '수요 변화와 비용 구조를 함께 봐야 합니다.'",
       "좋은 예: '자동차 산업은 판매대수보다 파워트레인 믹스와 지역별 가격 정책이 수익성을 가르는 국면입니다. 미국과 유럽에서는 전기차 재고와 인센티브 부담이 커지는 반면, 하이브리드는 연비 수요와 낮은 보조금 의존도 때문에 완성차 업체의 마진 방어 수단으로 기능하고 있습니다.'",
       "산업적 시사점은 '무엇을 해야 하는가'가 아니라 '이 산업은 어떤 구조로 움직이며, 어디서 이익과 리스크가 발생하는가'에 답해줘."
     ].join("\n"),
-    max_output_tokens: 6500,
+    max_output_tokens: isDeep ? 9000 : 6500,
     text: {
       format: {
         type: "json_schema",
         name: "industry_analysis",
         strict: true,
-        schema: industryAnalysisSchema()
+        schema: industryAnalysisSchema({ deep: isDeep })
       }
     }
   };
@@ -304,7 +308,12 @@ async function generateIndustryAnalysis({ industry, scope, period, reportType })
   return normalizeIndustryAnalysis(parsed, { industry, scope, period, reportType });
 }
 
-function industryAnalysisSchema() {
+function isDeepIndustryReport(reportType) {
+  return /심층|deep/i.test(String(reportType || ""));
+}
+
+function industryAnalysisSchema(options = {}) {
+  const deep = Boolean(options.deep);
   return {
     type: "object",
     additionalProperties: false,
@@ -317,6 +326,7 @@ function industryAnalysisSchema() {
       "revenue_cost_structure",
       "key_variables",
       "report_implications",
+      ...(deep ? ["deep_dive"] : []),
       "sources"
     ],
     properties: {
@@ -448,6 +458,7 @@ function industryAnalysisSchema() {
           discussion_points: { type: "array", minItems: 2, maxItems: 4, items: { type: "string" } }
         }
       },
+      ...(deep ? { deep_dive: industryDeepDiveSchema() } : {}),
       sources: {
         type: "array",
         minItems: 2,
@@ -468,6 +479,94 @@ function industryAnalysisSchema() {
   };
 }
 
+function industryDeepDiveSchema() {
+  return {
+    type: "object",
+    additionalProperties: false,
+    required: ["headline_thesis", "issue_flow", "subsector_breakdown", "indicator_watch", "scenario_analysis", "risk_factors"],
+    properties: {
+      headline_thesis: { type: "string" },
+      issue_flow: {
+        type: "array",
+        minItems: 3,
+        maxItems: 5,
+        items: {
+          type: "object",
+          additionalProperties: false,
+          required: ["issue", "evidence", "industry_impact"],
+          properties: {
+            issue: { type: "string" },
+            evidence: { type: "string" },
+            industry_impact: { type: "string" }
+          }
+        }
+      },
+      subsector_breakdown: {
+        type: "array",
+        minItems: 3,
+        maxItems: 6,
+        items: {
+          type: "object",
+          additionalProperties: false,
+          required: ["subsector", "current_condition", "revenue_logic", "cost_or_bottleneck", "outlook"],
+          properties: {
+            subsector: { type: "string" },
+            current_condition: { type: "string" },
+            revenue_logic: { type: "string" },
+            cost_or_bottleneck: { type: "string" },
+            outlook: { type: "string" }
+          }
+        }
+      },
+      indicator_watch: {
+        type: "array",
+        minItems: 4,
+        maxItems: 8,
+        items: {
+          type: "object",
+          additionalProperties: false,
+          required: ["indicator", "current_read", "why_it_moves_the_sector"],
+          properties: {
+            indicator: { type: "string" },
+            current_read: { type: "string" },
+            why_it_moves_the_sector: { type: "string" }
+          }
+        }
+      },
+      scenario_analysis: {
+        type: "array",
+        minItems: 3,
+        maxItems: 3,
+        items: {
+          type: "object",
+          additionalProperties: false,
+          required: ["case_name", "conditions", "industry_result"],
+          properties: {
+            case_name: { type: "string" },
+            conditions: { type: "string" },
+            industry_result: { type: "string" }
+          }
+        }
+      },
+      risk_factors: {
+        type: "array",
+        minItems: 3,
+        maxItems: 6,
+        items: {
+          type: "object",
+          additionalProperties: false,
+          required: ["risk", "transmission_path", "early_signal"],
+          properties: {
+            risk: { type: "string" },
+            transmission_path: { type: "string" },
+            early_signal: { type: "string" }
+          }
+        }
+      }
+    }
+  };
+}
+
 function extractResponseText(response) {
   if (response && typeof response.output_text === "string") return response.output_text;
   const chunks = [];
@@ -481,6 +580,7 @@ function extractResponseText(response) {
 
 function normalizeIndustryAnalysis(analysis, request) {
   const fallback = buildIndustryFallback(request);
+  const isDeep = isDeepIndustryReport(request.reportType);
   const normalized = {
     ...fallback,
     ...analysis,
@@ -507,6 +607,19 @@ function normalizeIndustryAnalysis(analysis, request) {
     },
     sources: Array.isArray(analysis.sources) && analysis.sources.length ? analysis.sources : fallback.sources
   };
+  if (isDeep) {
+    normalized.deep_dive = {
+      ...fallback.deep_dive,
+      ...(analysis.deep_dive || {}),
+      issue_flow: Array.isArray(analysis.deep_dive && analysis.deep_dive.issue_flow) ? analysis.deep_dive.issue_flow : fallback.deep_dive.issue_flow,
+      subsector_breakdown: Array.isArray(analysis.deep_dive && analysis.deep_dive.subsector_breakdown) ? analysis.deep_dive.subsector_breakdown : fallback.deep_dive.subsector_breakdown,
+      indicator_watch: Array.isArray(analysis.deep_dive && analysis.deep_dive.indicator_watch) ? analysis.deep_dive.indicator_watch : fallback.deep_dive.indicator_watch,
+      scenario_analysis: Array.isArray(analysis.deep_dive && analysis.deep_dive.scenario_analysis) ? analysis.deep_dive.scenario_analysis : fallback.deep_dive.scenario_analysis,
+      risk_factors: Array.isArray(analysis.deep_dive && analysis.deep_dive.risk_factors) ? analysis.deep_dive.risk_factors : fallback.deep_dive.risk_factors
+    };
+  } else {
+    delete normalized.deep_dive;
+  }
   return normalized;
 }
 
@@ -543,7 +656,7 @@ function buildIndustryFallback({ industry, scope, period, reportType }) {
       current_state: `${period} 기준으로는 수요 성장과 비용 부담이 동시에 존재하는 혼재 국면입니다. 매출이 늘어나는 구간에서도 원가 상승, 과잉 증설, 경쟁 심화가 겹치면 산업 전체 이익률은 기대보다 낮게 형성될 수 있습니다.`,
       demand_side: "수요는 최종 소비자의 구매력, 기업 고객의 CAPEX, 정책 지원, 교체 주기, 기술 전환에 의해 형성됩니다. 단기 수요가 강해도 장기 계약이나 반복 매출 구조가 약하면 산업의 실적 가시성은 낮아질 수 있습니다.",
       supply_side: "공급 측면에서는 핵심 부품, 인력, 설비, 기술 인증, 물류, 에너지 비용이 병목으로 작동합니다. 공급 제약이 있는 구간은 가격 협상력을 얻지만, 증설이 빠르게 진행되면 같은 구간이 중기적으로 마진 압박 요인으로 바뀔 수 있습니다.",
-      structural_change: "구조적으로는 단순 물량 성장보다 고부가 제품 믹스, 플랫폼화, 장기계약, 운영 효율화가 산업 이익을 좌우하는 방향으로 이동하고 있습니다. 따라서 산업 분석은 시장 규모 확대와 함께 이익이 남는 가치사슬 구간을 분리해서 봐야 합니다."
+      structural_change: "구조적으로는 단순 물량 성장보다 고부가 제품 믹스, 플랫폼화, 장기계약, 운영 효율화가 산업 이익을 좌우하는 방향으로 이동하고 있습니다. 따라서 산업 분석은 시장 규모 확대와 이익이 남는 가치사슬 구간을 함께 분리해 읽는 구조입니다."
     },
     market_trend: {
       unit: "시장 규모 추정치, 산업별 적정 단위",
@@ -583,6 +696,35 @@ function buildIndustryFallback({ industry, scope, period, reportType }) {
       { variable: "가격 전가력", current_signal: "원가 변동이 큰 산업일수록 가격 전가 여부가 매출 성장보다 중요해집니다.", impact_on_industry: "가격 전가가 가능한 기업은 비용 상승기에도 마진을 방어하고, 그렇지 못한 기업은 외형 성장에도 이익이 줄어듭니다.", affected_value_chain: "Production / Operation, Channel / Platform", evidence_to_watch: "ASP, 계약 구조, 가격 인상 발표, 고객 이탈률" },
       { variable: "정책/규제", current_signal: "정책은 수요를 앞당기거나 진입장벽을 높일 수 있지만, 동시에 비용과 불확실성도 만듭니다.", impact_on_industry: "보조금과 규제는 특정 기술·제품군의 성장 속도를 바꾸고, 기존 사업자의 투자 우선순위를 재배치합니다.", affected_value_chain: "전 밸류체인", evidence_to_watch: "보조금, 관세, 인허가, 환경·안전 규제 변경" }
     ],
+    deep_dive: {
+      headline_thesis: `${industry} 산업의 심층 분석은 수요 성장, 공급 제약, 가격 전가력, 정책 변화가 어느 방향으로 결합되는지에 달려 있습니다. 이 블록은 증권사 산업 리포트처럼 주요 이슈 플로우와 세부 섹터별 판단을 분리해 보여주기 위한 구조입니다.`,
+      issue_flow: [
+        { issue: "수요 사이클 변화", evidence: "최종 수요와 고객사 투자 집행이 산업 외형을 결정합니다.", industry_impact: "수요 확대가 가격 인상으로 이어지면 산업 이익률이 개선되지만, 공급 증가가 더 빠르면 매출 성장에도 마진은 제한됩니다." },
+        { issue: "공급망 병목", evidence: "핵심 부품, 인력, 설비, 인증에서 병목이 발생할 수 있습니다.", industry_impact: "병목 구간은 단기적으로 협상력을 갖고 산업 내 profit pool을 흡수합니다." },
+        { issue: "정책/규제 변화", evidence: "보조금, 관세, 인허가, 환경 규제가 투자 방향을 바꿉니다.", industry_impact: "정책은 신규 수요를 만들 수 있지만, 동시에 비용 부담과 경쟁 구도를 재편합니다." }
+      ],
+      subsector_breakdown: [
+        { subsector: "상위 공급망", current_condition: "핵심 투입 요소의 가격과 공급 안정성이 산업 전체 비용 구조를 좌우합니다.", revenue_logic: "장기계약과 고부가 부품 판매에서 매출이 발생합니다.", cost_or_bottleneck: "원재료 가격, 설비투자, 인증 장벽이 주요 병목입니다.", outlook: "대체 공급이 어려운 품목은 수요 둔화기에도 상대적으로 마진을 방어할 수 있습니다." },
+        { subsector: "제조/운영", current_condition: "가동률과 생산성이 이익률을 좌우하는 구간입니다.", revenue_logic: "판매량, ASP, 제품 믹스가 매출을 결정합니다.", cost_or_bottleneck: "고정비, 인건비, 에너지 비용이 손익 변동성을 만듭니다.", outlook: "수요 회복기에는 영업 레버리지가 크지만 둔화기에는 손익 훼손이 빠릅니다." },
+        { subsector: "채널/서비스", current_condition: "고객 접점과 반복 매출을 가진 사업자가 실적 가시성을 확보합니다.", revenue_logic: "유통 마진, 플랫폼 수수료, 유지보수, 구독형 매출이 발생합니다.", cost_or_bottleneck: "고객 획득 비용과 물류비가 주요 부담입니다.", outlook: "고객 락인이 강하면 제조 단계보다 안정적인 이익을 만들 수 있습니다." }
+      ],
+      indicator_watch: [
+        { indicator: "시장 규모/출하량", current_read: "산업 외형 성장 여부를 보여주는 1차 지표입니다.", why_it_moves_the_sector: "수요가 강하면 가동률과 투자 집행이 개선됩니다." },
+        { indicator: "ASP/가격", current_read: "가격 전가력과 경쟁 강도를 보여줍니다.", why_it_moves_the_sector: "ASP가 유지되면 원가 상승기에도 마진 방어가 가능합니다." },
+        { indicator: "가동률/수주잔고", current_read: "공급망의 실제 체감 수요를 보여줍니다.", why_it_moves_the_sector: "가동률 상승은 고정비 흡수와 이익률 개선으로 이어집니다." },
+        { indicator: "정책/보조금/관세", current_read: "수요와 비용을 동시에 움직이는 외생 변수입니다.", why_it_moves_the_sector: "정책 변화는 특정 하위 시장의 성장 속도와 경쟁 구도를 바꿉니다." }
+      ],
+      scenario_analysis: [
+        { case_name: "Bull Case", conditions: "수요 성장, 가격 전가, 공급 병목이 동시에 유지되는 경우", industry_result: "산업 외형과 마진이 함께 개선되고 병목 구간의 기업 가치가 재평가됩니다." },
+        { case_name: "Base Case", conditions: "수요는 성장하지만 비용 부담과 경쟁이 일부 상쇄되는 경우", industry_result: "산업은 성장하지만 하위 섹터별 이익 차별화가 커집니다." },
+        { case_name: "Bear Case", conditions: "수요 둔화와 공급 과잉, 정책 축소가 겹치는 경우", industry_result: "가격 하락과 가동률 둔화가 동시에 나타나 산업 마진이 훼손됩니다." }
+      ],
+      risk_factors: [
+        { risk: "공급 과잉", transmission_path: "증설이 수요보다 빠르면 가격 하락과 재고 증가가 발생합니다.", early_signal: "가동률 하락, 재고 증가, ASP 하락" },
+        { risk: "원가 상승", transmission_path: "원재료·인건비·물류비 상승이 비용 구조를 압박합니다.", early_signal: "원재료 가격 상승, 운임 상승, 가격 인상 실패" },
+        { risk: "정책 변화", transmission_path: "보조금 축소나 규제 강화가 수요와 비용을 동시에 악화시킵니다.", early_signal: "정책 예산 축소, 인허가 지연, 관세 변경" }
+      ]
+    },
     report_implications: {
       core_conclusion: `${industry} 산업은 시장 규모 확대만으로 판단하기보다, 수요 성장의 이익이 어느 가치사슬 구간에 남는지를 중심으로 해석해야 합니다.`,
       implications: [
@@ -630,10 +772,10 @@ async function generateCompanyAnalysis({ financials, reportType }) {
       "The output should feel like an analyst-built company study sheet: basic company identity first, business model second, DART financials third.",
       "Do not expose reasoning steps, analysis process, checklist language, or phrases like '확인해야 합니다'. The user only wants finished insights.",
       "Start with what the company does, what it mainly sells, who it serves, what value or strategy it claims, how it makes money, and only then connect the numbers.",
-      "The user hates generic 'how to analyze' language. Give concrete business structure and concrete So What.",
+      "The user hates generic 'how to analyze' language. Give concrete business structure and concrete 핵심 해석.",
       "Use the DART financial packet and market data supplied by the app. Use your own company knowledge for business structure, but do not invent exact segment revenue percentages unless provided.",
-      "Business Highlights means reasons the company is competitively or structurally interesting for study purposes. It is not investment advice.",
-      "For graphInsights, interpret the supplied five-year DART numbers: observed change, meaning, and So What.",
+      "사업적 강점 means reasons the company is competitively or structurally interesting for study purposes. It is not investment advice.",
+      "For graphInsights, interpret the supplied five-year DART numbers: observed change, meaning, and 시사점.",
       "If a fact is uncertain, write it directionally and make the uncertainty explicit in sourceNote, not in every sentence.",
       "Return only valid JSON matching the requested schema."
     ].join("\n"),
@@ -883,7 +1025,7 @@ function buildCompanyAnalysisFallback(financials, reportType) {
         title: "매출액 변화 추이",
         observation: `최근 매출은 ${formatWon(m.revenue)}이고 5개년 누적 변화는 ${formatPercent(revenueGrowth)}입니다.`,
         interpretation: "외형 성장만으로는 충분하지 않고 EBIT와 EBITDA가 같은 방향으로 개선되는지가 중요합니다.",
-        soWhat: "매출이 늘어도 이익률이 따라오지 않으면 성장의 질은 낮게 봐야 합니다."
+        soWhat: "매출이 늘어도 이익률이 따라오지 않으면 성장의 질은 낮게 평가됩니다."
       },
       {
         title: "EBITDA 변화 추이",
@@ -906,12 +1048,12 @@ function buildCompanyAnalysisFallback(financials, reportType) {
     ],
     onePageBrief: [
       `${name}: ${latest.year || "최신"}년 매출 ${formatWon(m.revenue)}, EBIT ${formatWon(m.operating_income)}.`,
-      `So what: EBIT margin ${formatPercent(opMargin)}과 CFO/EBIT ${formatMultiple(cfoToOp)}가 성장의 질을 판단하는 핵심입니다.`,
+      `핵심 해석: EBIT margin ${formatPercent(opMargin)}과 CFO/EBIT ${formatMultiple(cfoToOp)}가 성장의 질을 판단하는 핵심입니다.`,
       `재무 체력: 순차입금 ${formatWon(m.net_debt)}, 부채비율 ${formatPercent(m.debt_ratio)}.`,
       `현금흐름: ${pattern.type}. ${pattern.description}`,
       `밸류에이션: PER ${formatMultiple(valuation.per)}, EV/EBITDA ${formatMultiple(valuation.ev_ebitda)}.`
     ],
-    sourceNote: "DART 재무/시장 데이터 기반 fallback입니다. 사업부별 제품/고객 세부 정보는 사업보고서 원문 리서치로 추가 보강됩니다."
+    sourceNote: "DART 재무/시장 데이터 기반 요약입니다. 사업부별 제품/고객 세부 정보는 사업보고서 원문 리서치로 추가 보강됩니다."
   };
 }
 
@@ -958,7 +1100,7 @@ function buildLegacyIndustryFallbackFull({ industry, scope, period, reportType }
     talkingPoints: [
       "AI 반도체는 수요 고성장 산업이 아니라 병목 공급망 프리미엄 산업으로 바뀌고 있습니다.",
       "HBM과 첨단패키징은 AI 서버 출하를 제한하는 구간이기 때문에 최종 칩보다 높은 협상력을 갖는 순간이 생깁니다.",
-      "한국 반도체의 So What은 메모리 사이클 반등이 아니라 HBM을 통해 AI 인프라 밸류체인에 직접 편입된다는 점입니다."
+      "한국 반도체의 핵심 해석은 메모리 사이클 반등이 아니라 HBM을 통해 AI 인프라 밸류체인에 직접 편입된다는 점입니다."
     ],
     questions: ["HBM 공급 부족이 언제부터 가격 하락 압력으로 바뀔 수 있는가?", "AI CAPEX가 학습에서 추론으로 이동할 때 필요한 칩과 메모리 구조는 어떻게 달라지는가?"],
     chart: { marketSeries: [100, 132, 171, 224, 292], demandSeries: [100, 138, 196, 278, 390] }
@@ -1028,7 +1170,7 @@ function buildLegacyIndustryFallbackFull({ industry, scope, period, reportType }
     revenueCost: [
       { item: "Revenue", mechanism: "판매대수, ASP, SUV/HEV 믹스, 금융 매출이 외형을 만듭니다.", soWhat: "판매대수가 정체돼도 HEV와 SUV 믹스가 개선되면 매출과 마진이 동시에 방어됩니다." },
       { item: "Cost", mechanism: "원재료, 물류, 배터리, 관세, 인센티브가 비용 부담입니다.", soWhat: "인센티브가 낮은 차종을 팔 수 있는 업체가 업황 둔화기에도 이익을 지킵니다." },
-      { item: "Margin Driver", mechanism: "고부가 차종 믹스, 현지 생산, 플랫폼 공용화, 잔존가치가 마진을 좌우합니다.", soWhat: "자동차의 단기 So What은 전동화 속도보다 수익성 있는 전동화입니다." }
+      { item: "Margin Driver", mechanism: "고부가 차종 믹스, 현지 생산, 플랫폼 공용화, 잔존가치가 마진을 좌우합니다.", soWhat: "자동차의 단기 핵심 해석은 전동화 속도보다 수익성 있는 전동화입니다." }
     ],
     keyPlayers: [
       { name: "현대차/기아", position: "SUV와 HEV 라인업을 확대하는 글로벌 완성차", implication: "미국 HEV 수요 확대를 흡수하면 마진 방어와 점유율 확대가 동시에 가능합니다." },
@@ -1038,7 +1180,7 @@ function buildLegacyIndustryFallbackFull({ industry, scope, period, reportType }
     talkingPoints: [
       "자동차 산업의 핵심은 BEV 전환 속도가 아니라 수익성 있는 전동화 믹스입니다.",
       "HEV 쇼티지가 발생하면 완성차는 인센티브를 낮게 유지하면서 원가 인플레이션을 흡수할 수 있습니다.",
-      "현대차그룹의 So What은 미국 현지 생산과 HEV 라인업 확대가 관세·고정비 부담을 줄인다는 점입니다."
+      "현대차그룹의 핵심 해석은 미국 현지 생산과 HEV 라인업 확대가 관세·고정비 부담을 줄인다는 점입니다."
     ],
     questions: ["HEV 수요 확대가 BEV 재고와 완성차 인센티브에 어떤 영향을 주는가?", "현대차와 기아가 Toyota/Honda의 HEV 점유율을 가져올 수 있는 조건은 무엇인가?"],
     chart: { marketSeries: [100, 104, 108, 113, 118], demandSeries: [100, 109, 121, 136, 153] }
@@ -1166,7 +1308,7 @@ function buildLegacyIndustryFallbackFull({ industry, scope, period, reportType }
       marketSeries: [100, 112, 126, 143, 161],
       demandSeries: [100, 116, 134, 157, 184]
     },
-    sourceNote: "로컬 fallback 분석입니다. 실제 서비스에서는 증권사 리포트, 공시, 통계, 뉴스 원문을 함께 검증해야 합니다."
+    sourceNote: "기본 분석 요약입니다. 증권사 리포트, 공시, 통계, 뉴스 원문으로 출처를 함께 검증합니다."
   };
 }
 
@@ -1712,13 +1854,13 @@ function classifyCashFlowPattern(metrics) {
     "-+-": ["스타트업", "사업은 아직 돈을 벌지 못하고 외부 자금으로 버티며 투자하는 구간입니다."],
     "+-+": ["성장기업", "영업에서 돈을 벌기 시작했지만 CAPEX와 확장 투자 때문에 추가 자금 조달이 필요한 구간입니다."],
     "+--": ["우량기업", "영업현금흐름으로 투자와 차입 상환 또는 배당을 감당하는 안정적 패턴입니다."],
-    "++-": ["전환기업", "현금 유입은 있으나 투자 회수나 자산 매각 성격이 섞였는지 확인해야 합니다."],
+    "++-": ["전환기업", "현금 유입은 있으나 투자 회수나 자산 매각 성격이 섞인 패턴입니다."],
     "++-alt": ["성숙기업", "신규 투자보다 회수와 주주환원 또는 부채 상환이 중심인 구간입니다."],
     "---": ["쇠퇴기업", "영업, 투자, 재무 현금흐름이 모두 유출로 나타나면 현금 소진과 지속 가능성 점검이 필요합니다."],
     "-++": ["부실기업", "영업은 부진하고 투자 회수와 외부 조달로 버티는 패턴입니다."],
     "-+-alt": ["정리기업", "사업 정리와 재무구조 재편 과정일 수 있어 일회성 현금흐름을 분리해야 합니다."]
   };
-  const selected = patterns[key] || ["혼합형", "표준 패턴에 딱 맞지 않아 사업 이벤트, 일회성 투자, 차입 상환을 함께 확인해야 합니다."];
+  const selected = patterns[key] || ["혼합형", "사업 이벤트, 일회성 투자, 차입 상환이 함께 섞인 패턴입니다."];
   return {
     type: selected[0],
     signs: { operating: op, investing: inv, financing: fin },
@@ -1743,7 +1885,7 @@ function buildCompanyInsights(company, latest, financials) {
     `순차입금은 ${formatWon(metrics.net_debt)}, 부채비율은 ${formatPercent(metrics.debt_ratio)}로 재무 안정성 판단의 1차 기준이 됩니다.`,
     `현금흐름 패턴은 ${pattern.type}입니다. ${pattern.description}`,
     Number.isFinite(metrics.revenue_growth)
-      ? `최근 성장성은 매출 증가율 ${formatPercent(metrics.revenue_growth)}를 기준으로 산업 사이클과 회사 고유 경쟁력을 분리해 봐야 합니다.`
+      ? `최근 성장성은 매출 증가율 ${formatPercent(metrics.revenue_growth)}를 기준으로 산업 사이클과 회사 고유 경쟁력을 분리해 읽는 구조입니다.`
       : "전년 대비 성장률은 비교 연도 데이터가 확보되면 자동 계산됩니다.",
     marketLine,
     `${company.name || "해당 기업"} 분석 산출물에는 숫자 자체보다 고객(C), 상품(P), 채널(C), 재무 패턴을 연결한 해석이 포함되어야 합니다.`
@@ -1874,7 +2016,7 @@ function buildTemplateSummarySheet(sheet, financials) {
   ];
   sheet.getCell("B2").value = "Corporate analysis";
   sheet.getCell("B3").value = new Date().toISOString().slice(0, 10);
-  sheet.getRow(4).values = [null, "Summary", null, "(단위:백만원)", ...years, "CAGR", "Financials", null, null, null, "Industry/Corporate Analysis", "Investment Highlights / Risk Factors", "Comments"];
+  sheet.getRow(4).values = [null, "Summary", null, "(단위:백만원)", ...years, "CAGR", "Financials", null, null, null, "기업 기본정보 / 사업 분석", "사업적 강점 / 리스크 요인", "Comments"];
   sheet.getCell("B5").value = "No.";
   sheet.getCell("C5").value = 1;
   sheet.getCell("K5").value = "(단위:백만원)";
@@ -1884,7 +2026,7 @@ function buildTemplateSummarySheet(sheet, financials) {
   sheet.getCell("O5").value = "현금흐름 분석";
   sheet.getCell("T5").value = "현금성자산 / 부채비율";
   sheet.getCell("Y5").value = `○ ${financials.company.name || financials.company.corp_code} 기업 개요와 사업 포지션`;
-  sheet.getCell("Z5").value = "○ Investment Highlights";
+  sheet.getCell("Z5").value = "○ 사업적 강점";
   sheet.getCell("AA5").value = "DART API 기준 자동 생성. 주가/발행주식수는 별도 시장 데이터 기준일 확인 필요.";
 
   const rows = [
@@ -1954,7 +2096,7 @@ function buildTemplateSummarySheet(sheet, financials) {
   sheet.getCell("Y14").value = "○ Industry Analysis";
   sheet.getCell("Y15").value = "DART 사업보고서의 사업부, 주요 제품, 고객, 시장 전망과 재무 변화 연결";
   sheet.getCell("Y16").value = "산업 성장률보다 매출 성장, 마진, 현금흐름으로 확인되는 회사 고유 수혜를 우선 해석";
-  sheet.getCell("Z14").value = "○ Risk Factors";
+  sheet.getCell("Z14").value = "○ 리스크 요인";
   sheet.getCell("Z15").value = "매출 둔화, 마진 하락, 재고/운전자본 부담, 차입금 증가, 투자회수 지연";
   sheet.getCell("AA14").value = "작성 가이드 반영";
   sheet.getCell("AA15").value = `DART 최신 사업보고서 우선, 5개년 확보 시 과거 공시 조회, 음수 부호 유지, D&A 주석 확인. ${formatMarketDataNote(marketData, valuation)}`;
