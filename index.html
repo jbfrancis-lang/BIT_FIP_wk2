@@ -612,6 +612,84 @@
       font-weight: 900;
     }
 
+    .graph-insight {
+      border-top: 1px solid var(--line);
+      margin-top: 10px;
+      padding-top: 10px;
+      display: grid;
+      gap: 7px;
+      color: #273342;
+      font-size: 12px;
+      line-height: 1.5;
+    }
+
+    .graph-insight b {
+      color: var(--blue);
+      margin-right: 4px;
+    }
+
+    .company-summary-sheet {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      border: 2px solid #202936;
+      background: #fff;
+      margin-top: 8px;
+    }
+
+    .sheet-panel {
+      min-width: 0;
+      border-right: 2px solid #202936;
+    }
+
+    .sheet-panel:last-child {
+      border-right: 0;
+    }
+
+    .sheet-panel h4 {
+      margin: 0;
+      background: #315995;
+      color: #fff;
+      padding: 10px 12px;
+      text-align: center;
+      font-size: 14px;
+      letter-spacing: 0;
+    }
+
+    .sheet-list {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+    }
+
+    .sheet-list li {
+      border-top: 1px solid #cfd6de;
+      padding: 8px 10px;
+      color: #17202c;
+      font-size: 13px;
+      line-height: 1.45;
+      word-break: keep-all;
+      overflow-wrap: anywhere;
+    }
+
+    .sheet-list li.section-label {
+      font-weight: 900;
+      background: #f6f8fb;
+      color: #0e1724;
+    }
+
+    .financial-scroll {
+      overflow-x: auto;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: #fff;
+    }
+
+    .financial-scroll .data-table {
+      border: 0;
+      min-width: 760px;
+      margin: 0;
+    }
+
     .chain-grid {
       display: grid;
       grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -883,8 +961,18 @@
       .output-system,
       .two-col,
       .visual-grid,
+      .company-summary-sheet,
       .chain-grid {
         grid-template-columns: 1fr;
+      }
+
+      .sheet-panel {
+        border-right: 0;
+        border-bottom: 2px solid #202936;
+      }
+
+      .sheet-panel:last-child {
+        border-bottom: 0;
       }
 
       .workspace-head {
@@ -1168,12 +1256,14 @@
                       <div class="trend-graph" id="cashFlowChart"></div>
                     </div>
                   </div>
-                  <table class="data-table" id="financialTable">
-                    <thead>
-                      <tr><th>지표</th><th>최근 값</th><th>해석</th></tr>
-                    </thead>
-                    <tbody id="financialBody"></tbody>
-                  </table>
+                  <div class="financial-scroll" id="financialWrap">
+                    <table class="data-table" id="financialTable">
+                      <thead>
+                        <tr><th>지표</th><th>최근 값</th><th>해석</th></tr>
+                      </thead>
+                      <tbody id="financialBody"></tbody>
+                    </table>
+                  </div>
                   <div class="metric-grid hidden" id="valuationGrid"></div>
                   <div class="detail-grid hidden" id="companyDetailGrid"></div>
                   <div class="research-panel hidden" id="marketResearchPanel"></div>
@@ -1414,6 +1504,8 @@
       graphOneCaption: document.getElementById("graphOneCaption"),
       graphTwoTitle: document.getElementById("graphTwoTitle"),
       graphTwoCaption: document.getElementById("graphTwoCaption"),
+      graphGrid: document.getElementById("graphGrid"),
+      financialWrap: document.getElementById("financialWrap"),
       financialTable: document.getElementById("financialTable"),
       ebitdaChart: document.getElementById("ebitdaChart"),
       cashFlowChart: document.getElementById("cashFlowChart")
@@ -1628,10 +1720,19 @@
         per: formatMultiple(valuation.per),
         evEbitda: formatMultiple(valuation.ev_ebitda),
         priceDate: marketData.price_date || "확인 필요",
+        years: raw.periods.map(period => String(period.year || "")),
+        revenueSeries: raw.periods.map(period => toTrillion(period.metrics && period.metrics.revenue)),
+        ebitSeries: raw.periods.map(period => toTrillion(period.metrics && period.metrics.operating_income)),
         ebitdaSeries: raw.periods.map(period => toTrillion(period.metrics && (hasEbitda ? period.metrics.ebitda : period.metrics.operating_income))),
         earningsChartTitle: hasEbitda ? "EBITDA 변화 추이" : "EBIT 변화 추이",
         earningsChartCaption: hasEbitda ? "최근 5개년, 조원 단위" : "D&A 주석 보완 전, 최근 5개년 조원 단위",
         cfoSeries: raw.periods.map(period => toTrillion(period.metrics && period.metrics.operating_cash_flow)),
+        netDebtSeries: raw.periods.map(period => toTrillion(period.metrics && period.metrics.net_debt)),
+        cashSeries: raw.periods.map(period => toTrillion(period.metrics && period.metrics.cash_and_cash_equivalents)),
+        debtRatioSeries: raw.periods.map(period => percentPoint(period.metrics && period.metrics.debt_ratio)),
+        assetsSeries: raw.periods.map(period => toTrillion(period.metrics && period.metrics.total_assets)),
+        liabilitiesSeries: raw.periods.map(period => toTrillion(period.metrics && period.metrics.total_liabilities)),
+        equitySeries: raw.periods.map(period => toTrillion(period.metrics && period.metrics.total_equity)),
         companyAnalysis: raw.company_analysis || null,
         insight: raw.company_analysis ? raw.company_analysis.soWhatLead : (raw.insights || []).join(" "),
         latestYear: latest.year,
@@ -1648,6 +1749,53 @@
       }
     }
 
+    function setDefaultGraphGrid() {
+      els.graphGrid.innerHTML = `
+        <div class="graph-card">
+          <h4 id="graphOneTitle">시장 규모 성장 추이</h4>
+          <p id="graphOneCaption">시장규모 Index, 2021=100</p>
+          <div class="trend-graph" id="ebitdaChart"></div>
+        </div>
+        <div class="graph-card">
+          <h4 id="graphTwoTitle">수요 동인 변화</h4>
+          <p id="graphTwoCaption">핵심 수요 강도 Index</p>
+          <div class="trend-graph" id="cashFlowChart"></div>
+        </div>
+      `;
+      refreshGraphRefs();
+    }
+
+    function refreshGraphRefs() {
+      els.graphOneTitle = document.getElementById("graphOneTitle");
+      els.graphOneCaption = document.getElementById("graphOneCaption");
+      els.graphTwoTitle = document.getElementById("graphTwoTitle");
+      els.graphTwoCaption = document.getElementById("graphTwoCaption");
+      els.ebitdaChart = document.getElementById("ebitdaChart");
+      els.cashFlowChart = document.getElementById("cashFlowChart");
+    }
+
+    function setCompanyGraphGrid(graphs) {
+      els.graphGrid.innerHTML = graphs.map((graph, index) => `
+        <div class="graph-card">
+          <h4>${escapeHtml(graph.title)}</h4>
+          <p>${escapeHtml(graph.caption)}</p>
+          <div class="trend-graph" id="companyGraph${index}"></div>
+          <div class="graph-insight">
+            <div><b>관찰</b>${escapeHtml(graph.insight.observation)}</div>
+            <div><b>해석</b>${escapeHtml(graph.insight.interpretation)}</div>
+            <div><b>So what</b>${escapeHtml(graph.insight.soWhat)}</div>
+          </div>
+        </div>
+      `).join("");
+      graphs.forEach((graph, index) => {
+        renderTrendGraph(document.getElementById(`companyGraph${index}`), graph.values, graph.title, {
+          suffix: graph.suffix || "",
+          years: graph.years
+        });
+      });
+      refreshGraphRefs();
+    }
+
     function getIndustryRequestKey() {
       return [
         els.industryName.value.trim(),
@@ -1661,61 +1809,72 @@
       const reportType = els.reportType.value || "Preview";
       const scope = els.scope.value || "분석 범위";
       const period = els.period.value || "분석 기간";
-      const revenueRows = data.revenueCost.map(row => ({
-        item: row[0],
-        mechanism: row[1],
-        soWhat: row[2]
-      }));
+      const years = ["2021", "2022", "2023", "2024", "2025"];
       return {
         title: `${data.name} 산업분석`,
-        meta: ["Local analyst preview", scope, period, reportType],
-        analystView: {
-          oneLine: data.overview,
-          stance: `${data.name} 산업은 성장성 자체보다 병목 구간의 가격 결정력과 비용 전가력이 실적 차별화를 만드는 구간입니다.`,
-          thesis: [
-            data.overviewInsight.replace(/^So what:\s*/i, ""),
-            "최종 수요가 커져도 공급 제약과 고객 락인이 있는 기업에 이익이 더 크게 남습니다.",
-            "최근 이벤트의 의미는 뉴스 자체가 아니라 가격, 물량, 마진 중 어느 변수를 움직이는지에서 갈립니다."
-          ],
-          whyNow: `${scope} 기준 ${period} 흐름에서 ${data.name} 산업은 수요 성장과 비용 부담이 동시에 커지며 기업별 이익 체력 차이가 더 선명해지는 국면입니다.`
-        },
-        snapshot: {
+        meta: ["산업분석", scope, period, reportType, "Local preview"],
+        industry_overview: {
           definition: data.overview,
-          marketVariables: ["최종 수요", "공급 병목", "가격 전가력", "정책/규제", "주요 고객 투자 사이클"],
-          recentChange: `${data.name} 산업의 최근 관심은 시장 규모보다 수익성이 남는 구간으로 이동했습니다. 공급 병목, 고객 인증, 원가 전가력이 기업 간 밸류에이션 차이를 만듭니다.`
+          why_it_matters: data.overviewInsight.replace(/^So what:\s*/i, ""),
+          current_phase: "mixed",
+          key_demand_drivers: ["최종 수요 성장", "고객사 투자 사이클", "정책/규제 지원"],
+          key_supply_constraints: ["공급 병목", "CAPEX와 가동률 부담", "원가/환율 변동"]
         },
-        valueChain: data.chain.map(([stage, detail]) => ({
+        market_trend: {
+          unit: "Index, 시작연도=100",
+          series: years.map((year, index) => ({
+            year,
+            value: (data.marketSeries || [100, 110, 122, 136, 151])[index],
+            is_estimated: true,
+            note: "로컬 미리보기 방향성 지수",
+            source_reference: "local preview"
+          })),
+          interpretation: `${scope} ${period} 관점에서 ${data.name} 산업은 시장 성장 자체보다 밸류체인 내 이익 배분과 비용 전가력이 더 중요한 해석 포인트입니다.`
+        },
+        value_chain: data.chain.map(([stage, detail]) => ({
           stage,
-          detail,
-          implication: "이 구간의 협상력과 전환 비용이 산업 내 이익 배분을 좌우합니다."
+          role: detail,
+          power_holder: "병목 자원, 고객 접점, 기술/IP 중 하나를 가진 사업자",
+          margin_logic: "협상력과 전환 비용이 높을수록 원가 상승기에도 마진을 방어합니다.",
+          so_what: "취준생은 이 구간이 왜 이익을 가져가는지 설명하면 산업 이해도가 선명하게 드러납니다."
         })),
-        catalysts: [
-          { event: "정책/규제", impact: "투자 속도와 시장 진입 조건 변화", soWhat: "정책 수혜는 발표보다 수주와 설비투자로 연결되는 기업에서 실적으로 나타납니다." },
-          { event: "원가/환율", impact: "마진과 밸류에이션 할인율에 영향", soWhat: "가격 전가력이 약한 기업은 업황 회복기에도 이익 개선이 제한됩니다." },
-          { event: "고객 투자", impact: "B2B 수요와 주문 가시성 변화", soWhat: "고객사의 예산 집행이 늘어나는 구간에서는 장비·부품·소재 기업의 실적 레버리지가 먼저 나타납니다." }
+        revenue_cost_structure: {
+          revenue_sources: data.revenueCost.slice(0, 3).map(row => ({
+            source: row[0],
+            mechanism: row[1],
+            sensitivity: row[2]
+          })),
+          cost_drivers: [
+            { cost: "Input cost", mechanism: "원재료, 핵심 부품, 에너지, 물류비가 원가를 압박합니다.", risk: "가격 전가력이 약하면 매출 증가에도 마진이 훼손됩니다." },
+            { cost: "Fixed cost / CAPEX", mechanism: "설비 투자, 감가상각, 인건비, R&D가 고정비 부담을 만듭니다.", risk: "수요 둔화 시 가동률 하락이 이익률을 빠르게 낮춥니다." },
+            { cost: "Compliance / Quality", mechanism: "규제 대응, 인증, 품질보증, 안전 비용이 필요합니다.", risk: "인증 지연과 품질 이슈는 출하와 수익성을 동시에 훼손합니다." }
+          ],
+          profit_pool_insight: `${data.name} 산업의 profit pool은 최종 수요가 가장 큰 곳이 아니라 공급 병목, 고객 락인, 가격 전가력을 가진 구간에 남습니다.`
+        },
+        key_variables: [
+          { variable: "최종 수요 성장", direction: "positive", why_it_matters: "산업의 외형 성장을 만들지만 이익 배분을 단독으로 설명하지는 못합니다.", watch_metric: "시장 규모, 침투율, 고객사 CAPEX" },
+          { variable: "공급 병목", direction: "mixed", why_it_matters: "단기 가격을 지지하지만 과잉 증설은 중기 마진을 훼손합니다.", watch_metric: "증설 계획, 리드타임, 가동률" },
+          { variable: "가격 전가력", direction: "positive", why_it_matters: "원가 상승기에도 마진을 지키는 핵심 조건입니다.", watch_metric: "ASP, 계약 구조, 가격 인상 성공 여부" },
+          { variable: "정책/규제", direction: "mixed", why_it_matters: "수요를 만들 수도 있고 비용과 진입장벽을 높일 수도 있습니다.", watch_metric: "보조금, 인허가, 규제 변경" }
         ],
-        revenueCost: revenueRows,
-        keyPlayers: [
-          { name: "국내 선도 기업군", position: "규모와 고객 기반을 보유한 대표 기업", implication: "산업 성장의 1차 수혜 후보입니다." },
-          { name: "글로벌 리더", position: "기술, 원가, 브랜드, 고객 락인에서 우위", implication: "국내 기업 경쟁력을 비교할 기준점입니다." },
-          { name: "소부장/인프라 기업", position: "공급 병목에 위치한 기업군", implication: "최종 제품보다 높은 협상력을 가질 수 있습니다." }
-        ],
-        soWhat: {
-          talkingPoints: [
+        so_what: {
+          one_line: `${data.name} 산업의 핵심은 시장 성장률이 아니라 성장의 이익이 어느 밸류체인 구간에 남는가입니다.`,
+          three_bullets: [
             `${data.name} 산업의 핵심은 시장 성장률이 아니라 성장의 이익이 어느 밸류체인 구간에 남는가입니다.`,
             "수혜 기업과 피해 기업은 가격 전가력, 고정비 부담, 고객 락인에서 갈립니다.",
             "최근 이벤트가 실적으로 연결되는 경로를 설명하면 산업 이해도가 훨씬 선명하게 드러납니다."
           ],
-          interviewQuestions: [
+          interview_answer: `${data.name} 산업은 단순한 성장 산업이라기보다, 성장의 이익이 병목 구간과 고객 락인을 가진 구간에 집중되는 산업으로 이해하고 있습니다. 그래서 저는 시장 규모보다 가격 전가력과 밸류체인 협상력을 중심으로 봅니다.`,
+          study_discussion_points: [
             `${data.name} 산업에서 가장 가격 결정력이 강한 구간은 어디인가?`,
             "최근 뉴스 하나가 매출/비용/마진 중 어디에 영향을 주는가?"
-          ]
+          ],
+          resume_or_cover_letter_angle: `${data.name} 산업을 수요 성장뿐 아니라 revenue/cost 구조와 밸류체인 협상력 관점에서 해석했다는 점을 지원 직무의 사업 이해도로 연결할 수 있습니다.`
         },
-        chart: {
-          marketSeries: data.marketSeries,
-          demandSeries: data.demandSeries
-        },
-        sourceNote: "로컬 미리보기입니다. AI 생성 및 원문 리서치 연결 시 출처 검증 문구가 갱신됩니다."
+        sources: [
+          { title: "Local preview industry frame", publisher: "BIT Analysis", url: "", used_for: "산업 구조 미리보기" },
+          { title: "External research required", publisher: "증권사/통계/협회/정부 원문", url: "", used_for: "시장 규모와 성장률 수치 검증 필요" }
+        ]
       };
     }
 
@@ -1774,15 +1933,17 @@
         : buildLocalIndustryAnalysis(data);
       const title = analysis.title || `${data.name} 산업분석`;
 
-      els.sectionOneTitle.textContent = "1. Analyst View";
-      els.sectionTwoTitle.textContent = "2. Snapshot & Value Chain";
-      els.sectionThreeTitle.textContent = "3. Catalyst & Revenue / Cost";
-      els.sectionFourTitle.textContent = "4. Key Players & So What";
-      els.graphOneTitle.textContent = "시장/업황 강도";
-      els.graphOneCaption.textContent = "Index, 시작연도=100";
-      els.graphTwoTitle.textContent = "수요 동인 강도";
-      els.graphTwoCaption.textContent = "Index, 시작연도=100";
+      setDefaultGraphGrid();
+      els.sectionOneTitle.textContent = "1. 산업 개요";
+      els.sectionTwoTitle.textContent = "2. 밸류체인";
+      els.sectionThreeTitle.textContent = "3. Revenue / Cost & 핵심 변수";
+      els.sectionFourTitle.textContent = "4. So What";
+      els.graphOneTitle.textContent = "시장 규모 / 성장 추이";
+      els.graphOneCaption.textContent = analysis.market_trend.unit;
+      els.graphTwoTitle.textContent = "핵심 변수 방향성";
+      els.graphTwoCaption.textContent = "Positive=120, Mixed=100, Negative=80";
       els.financialTable.classList.add("hidden");
+      els.financialWrap.classList.add("hidden");
       els.valuationGrid.classList.add("hidden");
       els.companyDetailGrid.classList.add("hidden");
       els.marketResearchPanel.classList.add("hidden");
@@ -1791,32 +1952,171 @@
         .map(item => `<span class="badge">${escapeHtml(item)}</span>`).join("");
       els.reportTitle.textContent = title;
       els.overviewText.textContent = [
-        analysis.analystView.oneLine,
-        `업황 판단: ${analysis.analystView.stance}`,
-        `핵심 thesis: ${analysis.analystView.thesis.join(" / ")}`
+        analysis.industry_overview.definition,
+        `왜 중요한가: ${analysis.industry_overview.why_it_matters}`,
+        `현재 국면: ${phaseLabel(analysis.industry_overview.current_phase)}`
       ].join(" ");
-      els.overviewInsight.textContent = `Why now: ${analysis.analystView.whyNow}`;
-      els.chainGrid.innerHTML = analysis.valueChain.map(item => `
-        <div class="chain-card"><strong>${escapeHtml(item.stage)}</strong><small>${escapeHtml(item.detail)} · ${escapeHtml(item.implication)}</small></div>
+      els.overviewInsight.textContent = `수요 동인: ${analysis.industry_overview.key_demand_drivers.join(", ")} / 공급 제약: ${analysis.industry_overview.key_supply_constraints.join(", ")}`;
+      els.chainGrid.innerHTML = analysis.value_chain.map(item => `
+        <div class="chain-card"><strong>${escapeHtml(item.stage)}</strong><small>${escapeHtml(item.role)} · ${escapeHtml(item.power_holder)} · ${escapeHtml(item.so_what)}</small></div>
       `).join("");
-      els.chainInsight.textContent = `${analysis.snapshot.definition} 핵심 변수: ${analysis.snapshot.marketVariables.join(", ")}. 최근 변화: ${analysis.snapshot.recentChange}`;
-      const catalystRows = analysis.catalysts.map(row => [`Catalyst: ${row.event}`, row.impact, row.soWhat]);
-      const revenueRows = analysis.revenueCost.map(row => [row.item, row.mechanism, row.soWhat]);
-      els.revenueCostBody.innerHTML = [...catalystRows, ...revenueRows].map(row => `
+      els.chainInsight.textContent = `시장 추이 해석: ${analysis.market_trend.interpretation}`;
+      const revenueRows = analysis.revenue_cost_structure.revenue_sources.map(row => [`Revenue: ${row.source}`, row.mechanism, row.sensitivity]);
+      const costRows = analysis.revenue_cost_structure.cost_drivers.map(row => [`Cost: ${row.cost}`, row.mechanism, row.risk]);
+      const variableRows = analysis.key_variables.map(row => [`Variable: ${row.variable}`, `${directionLabel(row.direction)} · ${row.why_it_matters}`, `Watch: ${row.watch_metric}`]);
+      els.revenueCostBody.innerHTML = [...revenueRows, ...costRows, ...variableRows].map(row => `
         <tr><td><strong>${escapeHtml(row[0])}</strong></td><td>${escapeHtml(row[1])}</td><td>${escapeHtml(row[2])}</td></tr>
       `).join("");
-      renderTrendGraph(els.ebitdaChart, analysis.chart.marketSeries, "시장/업황", { suffix: "" });
-      renderTrendGraph(els.cashFlowChart, analysis.chart.demandSeries, "수요 동인", { suffix: "" });
-      const players = analysis.keyPlayers.map(player => `${player.name}: ${player.position} → ${player.implication}`).join(" / ");
-      const talkingPoints = analysis.soWhat.talkingPoints.map(point => `• ${point}`).join(" ");
-      const questions = analysis.soWhat.interviewQuestions.map(question => `Q. ${question}`).join(" ");
-      els.financialInsight.textContent = `Key players: ${players} So what: ${talkingPoints} Interview: ${questions}`;
-      els.sourceLine.textContent = analysis.sourceNote;
+      renderTrendGraph(els.ebitdaChart, seriesValues(analysis.market_trend.series), "시장 규모/성장", {
+        suffix: "",
+        years: analysis.market_trend.series.map(item => item.year)
+      });
+      renderTrendGraph(els.cashFlowChart, variableDirectionValues(analysis.key_variables), "핵심 변수", { suffix: "" });
+      const bullets = analysis.so_what.three_bullets.map(point => `• ${point}`).join(" ");
+      const discussions = analysis.so_what.study_discussion_points.map(question => `Q. ${question}`).join(" ");
+      els.financialInsight.textContent = `${analysis.so_what.one_line} ${bullets} 면접 답변: ${analysis.so_what.interview_answer} 스터디 질문: ${discussions} 자소서 각도: ${analysis.so_what.resume_or_cover_letter_angle}`;
+      els.sourceLine.textContent = `출처: ${sourceSummary(analysis.sources)}`;
       document.getElementById("downloadBtn").textContent = "리포트 내려받기";
       if (state.industryRequestKey !== getIndustryRequestKey()) {
-        els.dartStatus.textContent = "현재 화면은 로컬 미리보기입니다. 분석 생성을 누르면 AI가 입력값 기준으로 새 리포트를 작성합니다.";
+        els.dartStatus.textContent = "현재 화면은 로컬 미리보기입니다. 분석 생성을 누르면 AI가 산업 개요, 시장 추이, 밸류체인, Revenue/Cost, So what을 새로 작성합니다.";
       }
       state.markdown = buildIndustryMarkdown(title, analysis);
+    }
+
+    function buildCompanySummarySheet(data, fin) {
+      const analysis = data.analysis;
+      const corporateBullets = [
+        analysis.companyOverview,
+        ...analysis.businessStructure.slice(0, 3).map(item => `${item.segment}: ${item.soWhat}`),
+        ...analysis.revenueCost.slice(0, 2).map(item => `${item.item}: ${item.mechanism} / ${item.soWhat}`),
+        `DART 핵심: 매출 ${fin.revenue}, EBIT ${fin.ebit}, EBITDA ${fin.ebitda}, 영업현금흐름 ${fin.cfo}, 순차입금 ${fin.netDebt}`
+      ];
+      const highlightBullets = [
+        { label: "○ Investment Highlights", className: "section-label" },
+        ...analysis.investmentHighlights.map(text => ({ label: `# ${text}` })),
+        { label: "○ Risk Factors", className: "section-label" },
+        ...analysis.riskFactors.map(text => ({ label: `# ${text}` }))
+      ];
+      return `
+        <div class="company-summary-sheet">
+          <div class="sheet-panel">
+            <h4>Industry/Corporate Analysis</h4>
+            <ul class="sheet-list">${corporateBullets.map(text => `<li>${escapeHtml(text)}</li>`).join("")}</ul>
+          </div>
+          <div class="sheet-panel">
+            <h4>Investment Highlights / Risk Factors</h4>
+            <ul class="sheet-list">${highlightBullets.map(item => `<li class="${item.className || ""}">${escapeHtml(item.label)}</li>`).join("")}</ul>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderCompanyFinancialTable(data, fin) {
+      if (!fin.raw || !Array.isArray(fin.raw.periods)) {
+        els.financialTable.querySelector("thead").innerHTML = "<tr><th>지표</th><th>최근 값</th><th>해석</th></tr>";
+        els.financialBody.innerHTML = data.analysis.financialSoWhat
+          .map(row => `<tr><td><strong>${escapeHtml(row.metric)}</strong></td><td>${escapeHtml(row.value)}</td><td>${escapeHtml(`${row.interpretation} → ${row.soWhat}`)}</td></tr>`)
+          .join("");
+        return;
+      }
+
+      const periods = fin.raw.periods.filter(period => period.metrics && Object.keys(period.metrics).length);
+      const years = periods.map(period => String(period.year));
+      const rows = [
+        ["매출액", "revenue", "외형 규모와 성장 지속성"],
+        ["EBIT", "operating_income", "본업 수익성"],
+        ["EBITDA", "ebitda", "감가상각 전 현금성 영업이익"],
+        ["당기순이익", "net_income", "주주 귀속 이익"],
+        ["자산총계", "total_assets", "운용 자산 규모"],
+        ["부채총계", "total_liabilities", "재무 레버리지"],
+        ["자본총계", "total_equity", "자본 완충력"],
+        ["현금및현금성자산", "cash_and_cash_equivalents", "단기 유동성"],
+        ["순차입금", "net_debt", "재무 체력"],
+        ["영업현금흐름", "operating_cash_flow", "이익의 현금 전환"],
+        ["투자현금흐름", "investing_cash_flow", "CAPEX/투자 단계"],
+        ["재무현금흐름", "financing_cash_flow", "차입/상환/주주환원"]
+      ];
+      els.financialTable.querySelector("thead").innerHTML = `<tr><th>지표</th>${years.map(year => `<th>${escapeHtml(year)}</th>`).join("")}<th>해석</th></tr>`;
+      els.financialBody.innerHTML = rows.map(([label, key, note]) => `
+        <tr>
+          <td><strong>${escapeHtml(label)}</strong></td>
+          ${periods.map(period => `<td>${escapeHtml(formatWon(period.metrics[key]))}</td>`).join("")}
+          <td>${escapeHtml(note)}</td>
+        </tr>
+      `).join("");
+    }
+
+    function buildCompanyGraphs(data, fin) {
+      const years = fin.years && fin.years.length ? fin.years : ["2021", "2022", "2023", "2024", "2025"];
+      const graphInsights = data.analysis.graphInsights || [];
+      const findInsight = title => {
+        const matched = graphInsights.find(item => normalizeText(item.title || "").includes(normalizeText(title)) || normalizeText(title).includes(normalizeText(item.title || "")));
+        return matched || buildLocalGraphInsight(title, fin);
+      };
+      return [
+        {
+          title: "매출액 변화 추이",
+          caption: "최근 5개년, 조원 단위",
+          values: fin.revenueSeries || [],
+          years,
+          suffix: "조",
+          insight: findInsight("매출액")
+        },
+        {
+          title: fin.earningsChartTitle || "EBITDA 변화 추이",
+          caption: fin.earningsChartCaption || "최근 5개년, 조원 단위",
+          values: fin.ebitdaSeries || fin.ebitSeries || [],
+          years,
+          suffix: "조",
+          insight: findInsight("EBITDA")
+        },
+        {
+          title: "영업현금흐름 변화 추이",
+          caption: "최근 5개년, 조원 단위",
+          values: fin.cfoSeries || [],
+          years,
+          suffix: "조",
+          insight: findInsight("영업현금흐름")
+        },
+        {
+          title: "순차입금 변화 추이",
+          caption: "최근 5개년, 조원 단위",
+          values: fin.netDebtSeries || [],
+          years,
+          suffix: "조",
+          insight: findInsight("순차입금")
+        }
+      ];
+    }
+
+    function buildLocalGraphInsight(title, fin) {
+      const metric = title.replace(" 변화 추이", "");
+      if (title.includes("매출")) {
+        return {
+          observation: `최근 매출은 ${fin.revenue}입니다.`,
+          interpretation: "외형 성장만으로는 충분하지 않고 EBIT/EBITDA가 함께 개선되는지 봐야 합니다.",
+          soWhat: "매출 증가가 마진 개선으로 연결될 때 질 좋은 성장으로 해석할 수 있습니다."
+        };
+      }
+      if (title.includes("EBIT")) {
+        return {
+          observation: `최근 EBIT ${fin.ebit}, EBITDA ${fin.ebitda}입니다.`,
+          interpretation: "EBITDA는 감가상각 부담을 제거한 현금성 영업 체력을 보여줍니다.",
+          soWhat: "EBITDA가 회복되면 CAPEX 부담이 큰 기업도 다음 투자 사이클을 버틸 여력이 커집니다."
+        };
+      }
+      if (title.includes("현금")) {
+        return {
+          observation: `최근 영업현금흐름은 ${fin.cfo}입니다.`,
+          interpretation: "회계상 이익이 실제 현금으로 전환되는지가 이익의 질을 가릅니다.",
+          soWhat: "CFO가 안정적이면 투자, 차입 상환, 주주환원을 내부 현금으로 감당할 가능성이 높습니다."
+        };
+      }
+      return {
+        observation: `${metric}의 최근 값은 ${title.includes("순차입") ? fin.netDebt : "DART 조회값"}입니다.`,
+        interpretation: "순차입금은 현금 여력과 차입 부담을 동시에 보여주는 안정성 지표입니다.",
+        soWhat: "순현금 또는 낮은 순차입 구조는 업황 둔화와 투자 확대를 버티는 방어력입니다."
+      };
     }
 
     function renderCompanyReport() {
@@ -1829,40 +2129,42 @@
       const fin = data.financial;
       const title = `${data.company} 기업분석`;
       const detailed = els.reportType.value !== "1 page brief";
-      els.sectionOneTitle.textContent = "1. 기업 개요";
-      els.sectionTwoTitle.textContent = "2. 사업 구조";
-      els.sectionThreeTitle.textContent = "3. Revenue / Cost 구조";
-      els.sectionFourTitle.textContent = "4. DART 재무 인사이트";
-      els.graphOneTitle.textContent = fin.earningsChartTitle || "EBITDA 변화 추이";
-      els.graphOneCaption.textContent = fin.earningsChartCaption || "최근 5개년, 조원 단위";
-      els.graphTwoTitle.textContent = "영업현금흐름 변화 추이";
-      els.graphTwoCaption.textContent = "최근 5개년, 조원 단위";
+      els.sectionOneTitle.textContent = "1. Corporate Analysis / Highlights & Risks";
+      els.sectionTwoTitle.textContent = "2. DART 5개년 핵심 재무";
+      els.sectionThreeTitle.textContent = "3. 사업 포지션 & Revenue / Cost 구조";
+      els.sectionFourTitle.textContent = "4. DART Graph & Insight";
       els.financialTable.classList.remove("hidden");
+      els.financialWrap.classList.remove("hidden");
       document.getElementById("downloadBtn").textContent = fin.raw ? "엑셀 템플릿 내려받기" : "리포트 내려받기";
 
       els.reportMeta.innerHTML = ["기업분석", els.period.value, els.reportType.value]
         .concat(fin.raw ? [`DART ${fin.latestYear}`, "시장 데이터 보완"] : ["샘플/연동 대기"])
         .map(item => `<span class="badge">${escapeHtml(item)}</span>`).join("");
       els.reportTitle.textContent = title;
-      els.overviewText.textContent = data.overview;
-      els.overviewInsight.textContent = data.overviewInsight;
-      els.chainGrid.innerHTML = data.chain.map(([title, body]) => `
-        <div class="chain-card"><strong>${escapeHtml(title)}</strong><small>${escapeHtml(body)}</small></div>
+      els.overviewText.innerHTML = buildCompanySummarySheet(data, fin);
+      els.overviewInsight.textContent = `종합 So what: ${data.analysis.soWhatLead}`;
+      els.chainGrid.innerHTML = [
+        ["매출액", fin.revenue, "외형 규모"],
+        ["EBIT", fin.ebit, "본업 수익성"],
+        ["EBITDA", fin.ebitda, "현금성 영업 체력"],
+        ["영업현금흐름", fin.cfo, "이익의 현금 전환"],
+        ["순차입금", fin.netDebt, "재무 안정성"],
+        ["PER / EV·EBITDA", `${fin.per || "확인 필요"} / ${fin.evEbitda || "확인 필요"}`, "시장 기대치"]
+      ].map(([label, value, note]) => `
+        <div class="chain-card"><strong>${escapeHtml(label)}</strong><small>${escapeHtml(value)} · ${escapeHtml(note)}</small></div>
       `).join("");
-      els.chainInsight.textContent = data.chainInsight;
-      els.revenueCostBody.innerHTML = data.revenueCost.map(row => `
+      els.chainInsight.textContent = "DART 수치는 단순 요약값이 아니라 graph와 함께 읽어야 합니다. 매출, EBITDA, 영업현금흐름, 순차입금의 방향이 서로 같은지 보는 것이 핵심입니다.";
+      const structureRows = data.analysis.businessStructure.map(item => [
+        item.segment,
+        `${item.whatItDoes} / ${item.revenueLogic}`,
+        `${item.marginLogic} → ${item.soWhat}`
+      ]);
+      const revenueRows = data.analysis.revenueCost.map(row => [row.item, row.mechanism, row.soWhat]);
+      els.revenueCostBody.innerHTML = [...structureRows, ...revenueRows].map(row => `
         <tr><td><strong>${escapeHtml(row[0])}</strong></td><td>${escapeHtml(row[1])}</td><td>${escapeHtml(row[2])}</td></tr>
       `).join("");
-      const financialRows = data.analysis.financialSoWhat.map(row => [
-        row.metric,
-        row.value,
-        `${row.interpretation} → ${row.soWhat}`
-      ]);
-      els.financialBody.innerHTML = financialRows
-        .map(row => `<tr><td><strong>${escapeHtml(row[0])}</strong></td><td>${escapeHtml(row[1])}</td><td>${escapeHtml(row[2])}</td></tr>`)
-        .join("");
-      renderTrendGraph(els.ebitdaChart, fin.ebitdaSeries, "EBITDA", { suffix: "조" });
-      renderTrendGraph(els.cashFlowChart, fin.cfoSeries, "CFO", { suffix: "조" });
+      renderCompanyFinancialTable(data, fin);
+      setCompanyGraphGrid(buildCompanyGraphs(data, fin));
       renderCompanyDetailPanels(data, fin, detailed);
       els.financialInsight.textContent = `So what: ${fin.insight}`;
       els.sourceLine.textContent = `출처: ${fin.source}`;
@@ -2030,6 +2332,7 @@
       els.financialInsight.textContent = "";
       els.sourceLine.textContent = "";
       els.financialTable.classList.toggle("hidden", state.mode === "industry");
+      els.financialWrap.classList.toggle("hidden", state.mode === "industry");
       state.markdown = "";
     }
 
@@ -2037,32 +2340,38 @@
       return [
         `# ${title}`,
         "",
-        "## 1. Analyst View",
-        `- 한 줄 결론: ${data.analystView.oneLine}`,
-        `- 업황 판단: ${data.analystView.stance}`,
-        ...data.analystView.thesis.map(item => `- Thesis: ${item}`),
-        `- Why now: ${data.analystView.whyNow}`,
+        "## 1. 산업 개요",
+        data.industry_overview.definition,
+        `- 왜 중요한가: ${data.industry_overview.why_it_matters}`,
+        `- 현재 국면: ${phaseLabel(data.industry_overview.current_phase)}`,
+        `- 수요 동인: ${data.industry_overview.key_demand_drivers.join(", ")}`,
+        `- 공급 제약: ${data.industry_overview.key_supply_constraints.join(", ")}`,
         "",
-        "## 2. Industry Snapshot & Value Chain",
-        data.snapshot.definition,
-        `- 핵심 변수: ${data.snapshot.marketVariables.join(", ")}`,
-        `- 최근 변화: ${data.snapshot.recentChange}`,
-        ...data.valueChain.map(item => `- ${item.stage}: ${item.detail} → ${item.implication}`),
+        "## 2. 시장 규모 및 성장 추이",
+        `- 단위: ${data.market_trend.unit}`,
+        ...data.market_trend.series.map(item => `- ${item.year}: ${item.value}${item.is_estimated ? " (estimated)" : ""} / ${item.note}`),
+        `- 해석: ${data.market_trend.interpretation}`,
         "",
-        "## 3. Catalyst & Revenue / Cost",
-        ...data.catalysts.map(row => `- Catalyst | ${row.event}: ${row.impact} → ${row.soWhat}`),
-        ...data.revenueCost.map(row => `- ${row.item}: ${row.mechanism} → ${row.soWhat}`),
+        "## 3. 밸류체인",
+        ...data.value_chain.map(item => `- ${item.stage}: ${item.role} / 협상력: ${item.power_holder} / 마진: ${item.margin_logic} → ${item.so_what}`),
         "",
-        "## 4. Key Players & So What",
-        ...data.keyPlayers.map(player => `- ${player.name}: ${player.position} → ${player.implication}`),
-        ...data.soWhat.talkingPoints.map(point => `- Talking point: ${point}`),
-        ...data.soWhat.interviewQuestions.map(question => `- Interview question: ${question}`),
+        "## 4. Revenue / Cost 구조",
+        ...data.revenue_cost_structure.revenue_sources.map(row => `- Revenue | ${row.source}: ${row.mechanism} / 민감도: ${row.sensitivity}`),
+        ...data.revenue_cost_structure.cost_drivers.map(row => `- Cost | ${row.cost}: ${row.mechanism} / 리스크: ${row.risk}`),
+        `- Profit pool: ${data.revenue_cost_structure.profit_pool_insight}`,
         "",
-        "## Chart",
-        `- 시장/업황 강도: ${data.chart.marketSeries.join(" → ")}`,
-        `- 수요 동인 강도: ${data.chart.demandSeries.join(" → ")}`,
+        "## 5. 핵심 변수",
+        ...data.key_variables.map(row => `- ${row.variable}: ${directionLabel(row.direction)} / ${row.why_it_matters} / Watch: ${row.watch_metric}`),
         "",
-        `Source note: ${data.sourceNote}`
+        "## 6. So What",
+        `- 한 줄 결론: ${data.so_what.one_line}`,
+        ...data.so_what.three_bullets.map(point => `- ${point}`),
+        `- 면접 답변: ${data.so_what.interview_answer}`,
+        `- 자소서 각도: ${data.so_what.resume_or_cover_letter_angle}`,
+        ...data.so_what.study_discussion_points.map(question => `- 스터디 질문: ${question}`),
+        "",
+        "## Sources",
+        ...data.sources.map(source => `- ${source.publisher} | ${source.title}: ${source.used_for}${source.url ? ` (${source.url})` : ""}`)
       ].join("\n");
     }
 
@@ -2099,11 +2408,14 @@
     }
 
     function renderTrendGraph(container, values, label, options = {}) {
-      const years = ["2021", "2022", "2023", "2024", "2025"];
+      if (!container) return;
+      const years = options.years && options.years.length ? options.years : ["2021", "2022", "2023", "2024", "2025"];
       const width = 520;
       const height = 184;
       const pad = { left: 42, right: 18, top: 18, bottom: 34 };
-      const cleanValues = values && values.some(value => value > 0) ? values : [0, 0, 0, 0, 0];
+      const cleanValues = values && values.some(value => Number.isFinite(value) && value !== 0)
+        ? values.map(value => Number.isFinite(value) ? value : 0)
+        : years.map(() => 0);
       const max = Math.max(...cleanValues, 1);
       const min = Math.min(...cleanValues, 0);
       const range = Math.max(max - min, 1);
@@ -2116,8 +2428,8 @@
         <circle cx="${x(index)}" cy="${y(value)}" r="4.5" fill="#31c3b5" stroke="#fff" stroke-width="2"></circle>
         <text class="graph-value" x="${x(index)}" y="${y(value) - 9}" text-anchor="middle">${formatGraphValue(value)}${suffix}</text>
       `).join("");
-      const yearLabels = years.map((year, index) => `
-        <text class="graph-label" x="${x(index)}" y="${height - 10}" text-anchor="middle">${year}</text>
+      const yearLabels = cleanValues.map((_, index) => `
+        <text class="graph-label" x="${x(index)}" y="${height - 10}" text-anchor="middle">${years[index] || ""}</text>
       `).join("");
 
       container.innerHTML = `
@@ -2137,8 +2449,49 @@
       return Number(value).toFixed(1).replace(/\.0$/, "");
     }
 
+    function seriesValues(series) {
+      return Array.isArray(series) ? series.map(item => Number(item.value || 0)) : [0, 0, 0, 0, 0];
+    }
+
+    function variableDirectionValues(variables) {
+      const values = (variables || []).slice(0, 5).map(item => {
+        if (item.direction === "positive") return 120;
+        if (item.direction === "negative") return 80;
+        return 100;
+      });
+      while (values.length < 5) values.push(100);
+      return values;
+    }
+
+    function phaseLabel(phase) {
+      return ({
+        emerging: "태동기",
+        growth: "성장기",
+        mature: "성숙기",
+        declining: "쇠퇴기",
+        mixed: "혼재"
+      })[phase] || phase || "혼재";
+    }
+
+    function directionLabel(direction) {
+      return ({
+        positive: "긍정",
+        negative: "부정",
+        mixed: "혼재"
+      })[direction] || direction || "혼재";
+    }
+
+    function sourceSummary(sources) {
+      if (!Array.isArray(sources) || !sources.length) return "출처 검증 필요";
+      return sources.map(source => `${source.publisher} - ${source.title} (${source.used_for})`).join(" / ");
+    }
+
     function toTrillion(value) {
       return Number.isFinite(value) ? Number((value / 1_0000_0000_0000).toFixed(1)) : 0;
+    }
+
+    function percentPoint(value) {
+      return Number.isFinite(value) ? Number((value * 100).toFixed(1)) : 0;
     }
 
     function formatWon(value) {

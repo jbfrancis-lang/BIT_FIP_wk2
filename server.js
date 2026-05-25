@@ -250,13 +250,13 @@ async function generateIndustryAnalysis({ industry, scope, period, reportType })
   const payload = {
     model: openaiModel,
     instructions: [
-      "You are a Korean sell-side equity research analyst writing the actual industry report body.",
-      "Write outputs, not methodology. The user does not want '무엇을 봐야 하는지' or '확인해야 합니다' as the answer.",
-      "Every field must contain substantive analysis: current situation, causal mechanism, winners/losers, and concrete So What.",
-      "Use a Korean brokerage research tone: answer-first, causal, concise, practical, and opinionated.",
-      "For analystView.oneLine, write a sentence like: '{산업}은 최근 A가 진행되며 B한 상황입니다. {scope} 범위에서는 C가 중요하고 D가 수익성을 가릅니다.'",
-      "Do not fabricate exact market sizes, stock returns, earnings, or news dates. If fresh data is needed, write directional analysis and mention source verification only once in sourceNote.",
-      "Use the style of Korean securities industry reports: Analyst View, industry snapshot, catalysts/news flow, value chain, revenue/cost structure, key players, and interview-ready So What.",
+      "You are a Korean consulting research analyst writing the industry-analysis output for job seekers.",
+      "Analyze the industry only. Do not mix company analysis, DART disclosures, company revenue, EBIT, EBITDA, balance-sheet metrics, or valuation metrics.",
+      "Write outputs, not methodology. The user wants 'So what', not instructions about how to analyze.",
+      "Every field must contain substantive industry analysis: current situation, causal mechanism, value-chain power, revenue/cost logic, watch variables, and interview-ready implications.",
+      "Use an answer-first, causal, concise, practical Korean business tone.",
+      "Do not fabricate exact market sizes, stock returns, financial statements, or news dates. If a number is directional or estimated, mark is_estimated true and explain the source_reference cautiously.",
+      "Keep the same output structure regardless of report type; use report type only to control depth and density.",
       "Return only valid JSON matching the requested schema."
     ].join("\n"),
     input: [
@@ -264,13 +264,12 @@ async function generateIndustryAnalysis({ industry, scope, period, reportType })
       `분석 범위: ${scope}`,
       `분석 기간: ${period}`,
       `리포트 유형: ${reportType}`,
-      "증권사 산업분석 리포트 스타일로 웹앱에 바로 렌더링할 수 있는 구조화 결과를 작성해줘.",
-      "분석 방법을 설명하지 말고, 실제 산업에 대한 결론과 근거를 써줘.",
+      "웹앱에 바로 렌더링할 수 있도록 다음 흐름을 지켜줘: 산업 개요, 시장 규모/성장 추이 graph, 밸류체인, Revenue/Cost 구조, 핵심 변수, 취준생용 So what.",
       "나쁜 예: '수요 변화와 비용 구조를 함께 봐야 합니다.'",
-      "좋은 예: 'AI 반도체는 CSP의 AI 서버 투자가 GPU에서 HBM·첨단패키징 병목으로 확산되며, 이익은 최종 칩보다 공급 제약 구간에 더 집중되는 상황입니다.'",
-      "각 So What은 '그래서 누가 유리한가/어떤 비용이 마진을 누르는가/왜 지금 중요한가'에 답해줘."
+      "좋은 예: 'AI 반도체는 AI 서버 투자가 GPU에서 HBM·첨단패키징 병목으로 확산되며, 산업 이익은 최종 수요보다 공급 제약 구간에 집중되는 구조입니다.'",
+      "So what은 '면접에서 어떤 관점으로 말해야 하는가', '산업에서 돈이 남는 곳은 어디인가', '성장률보다 중요한 변수는 무엇인가'에 답해줘."
     ].join("\n"),
-    max_output_tokens: 2400,
+    max_output_tokens: 4200,
     text: {
       format: {
         type: "json_schema",
@@ -309,119 +308,154 @@ function industryAnalysisSchema() {
     required: [
       "title",
       "meta",
-      "analystView",
-      "snapshot",
-      "valueChain",
-      "catalysts",
-      "revenueCost",
-      "keyPlayers",
-      "soWhat",
-      "chart",
-      "sourceNote"
+      "industry_overview",
+      "market_trend",
+      "value_chain",
+      "revenue_cost_structure",
+      "key_variables",
+      "so_what",
+      "sources"
     ],
     properties: {
       title: { type: "string" },
       meta: { type: "array", minItems: 3, maxItems: 5, items: { type: "string" } },
-      analystView: {
+      industry_overview: {
         type: "object",
         additionalProperties: false,
-        required: ["oneLine", "stance", "thesis", "whyNow"],
-        properties: {
-          oneLine: { type: "string" },
-          stance: { type: "string" },
-          thesis: { type: "array", minItems: 2, maxItems: 3, items: { type: "string" } },
-          whyNow: { type: "string" }
-        }
-      },
-      snapshot: {
-        type: "object",
-        additionalProperties: false,
-        required: ["definition", "marketVariables", "recentChange"],
+        required: ["definition", "why_it_matters", "current_phase", "key_demand_drivers", "key_supply_constraints"],
         properties: {
           definition: { type: "string" },
-          marketVariables: { type: "array", minItems: 3, maxItems: 5, items: { type: "string" } },
-          recentChange: { type: "string" }
+          why_it_matters: { type: "string" },
+          current_phase: { type: "string", enum: ["emerging", "growth", "mature", "declining", "mixed"] },
+          key_demand_drivers: { type: "array", minItems: 3, maxItems: 5, items: { type: "string" } },
+          key_supply_constraints: { type: "array", minItems: 3, maxItems: 5, items: { type: "string" } }
         }
       },
-      valueChain: {
+      market_trend: {
+        type: "object",
+        additionalProperties: false,
+        required: ["unit", "series", "interpretation"],
+        properties: {
+          unit: { type: "string" },
+          series: {
+            type: "array",
+            minItems: 5,
+            maxItems: 5,
+            items: {
+              type: "object",
+              additionalProperties: false,
+              required: ["year", "value", "is_estimated", "note", "source_reference"],
+              properties: {
+                year: { type: "string" },
+                value: { type: "number" },
+                is_estimated: { type: "boolean" },
+                note: { type: "string" },
+                source_reference: { type: "string" }
+              }
+            }
+          },
+          interpretation: { type: "string" }
+        }
+      },
+      value_chain: {
         type: "array",
         minItems: 4,
-        maxItems: 5,
+        maxItems: 6,
         items: {
           type: "object",
           additionalProperties: false,
-          required: ["stage", "detail", "implication"],
+          required: ["stage", "role", "power_holder", "margin_logic", "so_what"],
           properties: {
             stage: { type: "string" },
-            detail: { type: "string" },
-            implication: { type: "string" }
+            role: { type: "string" },
+            power_holder: { type: "string" },
+            margin_logic: { type: "string" },
+            so_what: { type: "string" }
           }
         }
       },
-      catalysts: {
+      revenue_cost_structure: {
+        type: "object",
+        additionalProperties: false,
+        required: ["revenue_sources", "cost_drivers", "profit_pool_insight"],
+        properties: {
+          revenue_sources: {
+            type: "array",
+            minItems: 3,
+            maxItems: 5,
+            items: {
+              type: "object",
+              additionalProperties: false,
+              required: ["source", "mechanism", "sensitivity"],
+              properties: {
+                source: { type: "string" },
+                mechanism: { type: "string" },
+                sensitivity: { type: "string" }
+              }
+            }
+          },
+          cost_drivers: {
+            type: "array",
+            minItems: 3,
+            maxItems: 5,
+            items: {
+              type: "object",
+              additionalProperties: false,
+              required: ["cost", "mechanism", "risk"],
+              properties: {
+                cost: { type: "string" },
+                mechanism: { type: "string" },
+                risk: { type: "string" }
+              }
+            }
+          },
+          profit_pool_insight: { type: "string" }
+        }
+      },
+      key_variables: {
         type: "array",
-        minItems: 3,
+        minItems: 4,
+        maxItems: 6,
+        items: {
+          type: "object",
+          additionalProperties: false,
+          required: ["variable", "direction", "why_it_matters", "watch_metric"],
+          properties: {
+            variable: { type: "string" },
+            direction: { type: "string", enum: ["positive", "negative", "mixed"] },
+            why_it_matters: { type: "string" },
+            watch_metric: { type: "string" }
+          }
+        }
+      },
+      so_what: {
+        type: "object",
+        additionalProperties: false,
+        required: ["one_line", "three_bullets", "interview_answer", "study_discussion_points", "resume_or_cover_letter_angle"],
+        properties: {
+          one_line: { type: "string" },
+          three_bullets: { type: "array", minItems: 3, maxItems: 3, items: { type: "string" } },
+          interview_answer: { type: "string" },
+          study_discussion_points: { type: "array", minItems: 2, maxItems: 4, items: { type: "string" } },
+          resume_or_cover_letter_angle: { type: "string" }
+        }
+      },
+      sources: {
+        type: "array",
+        minItems: 2,
         maxItems: 5,
         items: {
           type: "object",
           additionalProperties: false,
-          required: ["event", "impact", "soWhat"],
+          required: ["title", "publisher", "url", "used_for"],
           properties: {
-            event: { type: "string" },
-            impact: { type: "string" },
-            soWhat: { type: "string" }
+            title: { type: "string" },
+            publisher: { type: "string" },
+            url: { type: "string" },
+            used_for: { type: "string" }
           }
         }
-      },
-      revenueCost: {
-        type: "array",
-        minItems: 3,
-        maxItems: 4,
-        items: {
-          type: "object",
-          additionalProperties: false,
-          required: ["item", "mechanism", "soWhat"],
-          properties: {
-            item: { type: "string" },
-            mechanism: { type: "string" },
-            soWhat: { type: "string" }
-          }
-        }
-      },
-      keyPlayers: {
-        type: "array",
-        minItems: 3,
-        maxItems: 5,
-        items: {
-          type: "object",
-          additionalProperties: false,
-          required: ["name", "position", "implication"],
-          properties: {
-            name: { type: "string" },
-            position: { type: "string" },
-            implication: { type: "string" }
-          }
-        }
-      },
-      soWhat: {
-        type: "object",
-        additionalProperties: false,
-        required: ["talkingPoints", "interviewQuestions"],
-        properties: {
-          talkingPoints: { type: "array", minItems: 3, maxItems: 4, items: { type: "string" } },
-          interviewQuestions: { type: "array", minItems: 2, maxItems: 3, items: { type: "string" } }
-        }
-      },
-      chart: {
-        type: "object",
-        additionalProperties: false,
-        required: ["marketSeries", "demandSeries"],
-        properties: {
-          marketSeries: { type: "array", minItems: 5, maxItems: 5, items: { type: "number" } },
-          demandSeries: { type: "array", minItems: 5, maxItems: 5, items: { type: "number" } }
-        }
-      },
-      sourceNote: { type: "string" }
+      }
     }
   };
 }
@@ -439,16 +473,48 @@ function extractResponseText(response) {
 
 function normalizeIndustryAnalysis(analysis, request) {
   const fallback = buildIndustryFallback(request);
-  return {
+  const normalized = {
     ...fallback,
     ...analysis,
     title: analysis.title || fallback.title,
     meta: Array.isArray(analysis.meta) && analysis.meta.length ? analysis.meta : fallback.meta,
-    chart: {
-      marketSeries: normalizeSeries(analysis.chart && analysis.chart.marketSeries, fallback.chart.marketSeries),
-      demandSeries: normalizeSeries(analysis.chart && analysis.chart.demandSeries, fallback.chart.demandSeries)
-    }
+    industry_overview: {
+      ...fallback.industry_overview,
+      ...(analysis.industry_overview || {})
+    },
+    market_trend: {
+      ...fallback.market_trend,
+      ...(analysis.market_trend || {}),
+      series: normalizeMarketSeries(analysis.market_trend && analysis.market_trend.series, fallback.market_trend.series)
+    },
+    value_chain: Array.isArray(analysis.value_chain) && analysis.value_chain.length ? analysis.value_chain : fallback.value_chain,
+    revenue_cost_structure: {
+      ...fallback.revenue_cost_structure,
+      ...(analysis.revenue_cost_structure || {})
+    },
+    key_variables: Array.isArray(analysis.key_variables) && analysis.key_variables.length ? analysis.key_variables : fallback.key_variables,
+    so_what: {
+      ...fallback.so_what,
+      ...(analysis.so_what || {})
+    },
+    sources: Array.isArray(analysis.sources) && analysis.sources.length ? analysis.sources : fallback.sources
   };
+  return normalized;
+}
+
+function normalizeMarketSeries(series, fallback) {
+  if (!Array.isArray(series) || series.length !== 5) return fallback;
+  return series.map((item, index) => {
+    const fallbackItem = fallback[index] || {};
+    const value = Number(item && item.value);
+    return {
+      year: String((item && item.year) || fallbackItem.year || ""),
+      value: Number.isFinite(value) ? value : Number(fallbackItem.value || 0),
+      is_estimated: Boolean(item && item.is_estimated),
+      note: String((item && item.note) || fallbackItem.note || ""),
+      source_reference: String((item && item.source_reference) || fallbackItem.source_reference || "")
+    };
+  });
 }
 
 function normalizeSeries(series, fallback) {
@@ -456,14 +522,105 @@ function normalizeSeries(series, fallback) {
   return series.map(Number);
 }
 
+function buildIndustryFallback({ industry, scope, period, reportType }) {
+  const currentYear = new Date().getFullYear();
+  const years = Array.from({ length: 5 }, (_, index) => String(currentYear - 4 + index));
+  return {
+    title: `${industry} 산업분석`,
+    meta: ["산업분석", scope, period, reportType],
+    industry_overview: {
+      definition: `${industry} 산업은 최종 수요, 공급망, 가격 결정 구조, 규제/정책 변화가 연결되어 움직이는 시장입니다.`,
+      why_it_matters: `${scope} 기준 ${industry} 산업의 핵심은 시장 성장 여부보다 성장의 이익이 어느 밸류체인 구간에 남는지입니다.`,
+      current_phase: "mixed",
+      key_demand_drivers: ["최종 수요 성장", "고객사 투자 사이클", "정책/규제 지원"],
+      key_supply_constraints: ["핵심 원재료/부품 병목", "CAPEX와 가동률 부담", "인력·기술·인허가 제약"]
+    },
+    market_trend: {
+      unit: "Index, 시작연도=100",
+      series: years.map((year, index) => ({
+        year,
+        value: [100, 112, 126, 143, 161][index],
+        is_estimated: true,
+        note: "외부 원문 리서치 미연결 상태의 방향성 지수",
+        source_reference: "local fallback"
+      })),
+      interpretation: `${period} 관점에서 ${industry} 산업은 수요 성장과 비용 부담이 동시에 커지며, 단순 시장 확대보다 이익이 남는 구간을 식별하는 것이 중요합니다.`
+    },
+    value_chain: [
+      { stage: "Upstream", role: "원재료, 핵심 부품, 기술/IP, 설비를 공급합니다.", power_holder: "대체재가 적거나 병목을 가진 공급자", margin_logic: "공급 부족기에는 가격 전가력이 높아지고 장기계약이 마진을 방어합니다.", so_what: "취준생은 최종 제품보다 공급 병목이 어디인지 먼저 설명하면 산업 이해도가 선명해집니다." },
+      { stage: "Production / Operation", role: "제조, 운영, 품질, 수율, CAPEX 집행을 담당합니다.", power_holder: "수율·가동률·운영 효율을 안정화한 사업자", margin_logic: "고정비 비중이 높아 가동률 변화가 이익률에 크게 반영됩니다.", so_what: "성장 산업이어도 생산성이 낮으면 매출은 늘고 이익은 남지 않을 수 있습니다." },
+      { stage: "Channel / Platform", role: "유통, 플랫폼, B2B 고객 접점, 장기 계약을 만듭니다.", power_holder: "고객 락인과 데이터/채널을 보유한 사업자", margin_logic: "전환 비용이 높을수록 가격 인상과 반복 매출이 쉬워집니다.", so_what: "반복 매출과 고객 락인이 있는 구간은 업황 둔화에도 실적 가시성이 높습니다." },
+      { stage: "End Demand", role: "최종 소비자/기업 수요와 교체·투자 사이클을 결정합니다.", power_holder: "예산을 집행하는 핵심 고객군", margin_logic: "수요가 좋아도 가격 전가가 약하면 이익은 공급망 다른 구간에 남습니다.", so_what: "면접에서는 수요 성장만 말하기보다 그 수요가 가격과 마진으로 전환되는 경로를 말해야 합니다." }
+    ],
+    revenue_cost_structure: {
+      revenue_sources: [
+        { source: "Volume", mechanism: "최종 수요, 교체주기, 고객사 투자 집행이 물량을 만듭니다.", sensitivity: "경기와 고객 예산에 민감합니다." },
+        { source: "Price / ASP", mechanism: "공급 부족, 고부가 제품 믹스, 브랜드/기술 우위가 가격을 만듭니다.", sensitivity: "경쟁 심화와 증설 속도에 민감합니다." },
+        { source: "Recurring / Contract", mechanism: "장기계약, 구독, 유지보수, 반복 구매가 매출 안정성을 만듭니다.", sensitivity: "고객 락인과 전환 비용에 민감합니다." }
+      ],
+      cost_drivers: [
+        { cost: "Input cost", mechanism: "원재료, 핵심 부품, 에너지, 물류비가 원가를 압박합니다.", risk: "가격 전가력이 약하면 매출 증가에도 마진이 훼손됩니다." },
+        { cost: "Fixed cost / CAPEX", mechanism: "설비 투자, 감가상각, 인건비, R&D가 고정비 부담을 만듭니다.", risk: "수요 둔화 시 가동률 하락이 이익률을 빠르게 낮춥니다." },
+        { cost: "Compliance / Quality", mechanism: "규제 대응, 인증, 품질보증, 안전 비용이 필요합니다.", risk: "인증 지연과 품질 이슈는 출하와 수익성을 동시에 훼손합니다." }
+      ],
+      profit_pool_insight: `${industry} 산업의 profit pool은 최종 수요가 가장 큰 곳이 아니라, 공급 병목·고객 락인·가격 전가력을 가진 구간에 남습니다.`
+    },
+    key_variables: [
+      { variable: "최종 수요 성장", direction: "positive", why_it_matters: "산업의 외형 성장을 결정하지만 이익 배분을 단독으로 설명하지는 못합니다.", watch_metric: "시장 규모, 침투율, 고객사 CAPEX" },
+      { variable: "공급 병목과 증설 속도", direction: "mixed", why_it_matters: "병목은 단기 가격을 지지하지만 과잉 증설은 중기 마진을 훼손합니다.", watch_metric: "증설 계획, 리드타임, 가동률" },
+      { variable: "가격 전가력", direction: "positive", why_it_matters: "원가 상승기에도 마진을 지키는 핵심 조건입니다.", watch_metric: "ASP, 계약 구조, 가격 인상 성공 여부" },
+      { variable: "정책/규제", direction: "mixed", why_it_matters: "수요를 만들 수도 있고 비용과 진입장벽을 높일 수도 있습니다.", watch_metric: "보조금, 인허가, 규제 변경" }
+    ],
+    so_what: {
+      one_line: `${industry} 산업은 성장률보다 밸류체인 내 협상력과 가격 전가력이 취준생이 말해야 할 핵심 포인트입니다.`,
+      three_bullets: [
+        "시장 성장 자체보다 이익이 어느 구간에 남는지 설명해야 합니다.",
+        "수혜/피해 구간은 공급 병목, 고객 락인, 원가 전가력으로 갈립니다.",
+        "면접에서는 최근 뉴스가 매출, 비용, 마진 중 어떤 변수로 연결되는지 말하는 편이 좋습니다."
+      ],
+      interview_answer: `${industry} 산업은 단순히 성장하는 산업이라기보다, 성장의 이익이 밸류체인 내 병목 구간에 집중되는 산업으로 이해하고 있습니다. 그래서 저는 시장 규모보다 공급 제약, 가격 전가력, 고객 락인 여부를 중심으로 산업 매력도를 판단합니다.`,
+      study_discussion_points: [
+        "이 산업에서 가장 협상력이 강한 밸류체인 구간은 어디인가?",
+        "최근 뉴스 하나가 매출, 비용, 마진 중 어디에 영향을 주는가?"
+      ],
+      resume_or_cover_letter_angle: `${industry} 산업을 수요 성장뿐 아니라 revenue/cost 구조와 밸류체인 협상력 관점에서 해석했다는 점을 지원 직무의 사업 이해도로 연결할 수 있습니다.`
+    },
+    sources: [
+      { title: "Local fallback industry structure", publisher: "BIT Analysis", url: "", used_for: "산업 구조와 밸류체인 기본 프레임" },
+      { title: "External research required", publisher: "증권사/통계/협회/정부 원문", url: "", used_for: "시장 규모와 성장률 수치 검증 필요" }
+    ]
+  };
+}
+
+function legacyIndustryChart(analysis, fallback) {
+  return {
+    marketSeries: normalizeSeries(analysis.chart && analysis.chart.marketSeries, fallback.chart.marketSeries),
+    demandSeries: normalizeSeries(analysis.chart && analysis.chart.demandSeries, fallback.chart.demandSeries)
+  };
+}
+
+function legacyIndustryFallback({ industry, scope, period, reportType }) {
+  return {
+    title: `${industry} 산업분석`,
+    meta: ["Local analyst fallback", scope, period, reportType],
+    chart: {
+      marketSeries: [100, 112, 126, 143, 161],
+      demandSeries: [100, 116, 134, 157, 184]
+    }
+  };
+}
+
 async function generateCompanyAnalysis({ financials, reportType }) {
   const payload = {
     model: openaiModel,
     instructions: [
-      "You are a Korean sell-side equity research analyst.",
-      "Write company analysis outputs, not instructions or methodology.",
+      "You are a Korean corporate study analyst building a one-company study sheet for BIT Analysis.",
+      "Write company analysis outputs, not instructions, methodology, interview answers, or resume sentences.",
+      "The output should feel like an analyst-built Excel study sheet: Corporate Analysis, Investment Highlights, Risk Factors, DART financial insights, and graph-by-graph interpretation.",
       "The user hates generic 'how to analyze' language. Do not say '확인해야 합니다' as a substitute for an insight. Give concrete business structure and concrete So What.",
       "Use the DART financial packet and market data supplied by the app. Use your own company knowledge for business structure, but do not invent exact segment revenue percentages unless provided.",
+      "Investment Highlights means reasons to view the company positively for study purposes. It is not investment advice.",
+      "For graphInsights, interpret the supplied five-year DART numbers: observed change, meaning, and So What.",
       "If a fact is uncertain, write it directionally and make the uncertainty explicit in sourceNote, not in every sentence.",
       "Return only valid JSON matching the requested schema."
     ].join("\n"),
@@ -524,6 +681,7 @@ function companyAnalysisSchema() {
       "financialSoWhat",
       "investmentHighlights",
       "riskFactors",
+      "graphInsights",
       "onePageBrief",
       "sourceNote"
     ],
@@ -582,6 +740,22 @@ function companyAnalysisSchema() {
       },
       investmentHighlights: { type: "array", minItems: 3, maxItems: 5, items: { type: "string" } },
       riskFactors: { type: "array", minItems: 3, maxItems: 5, items: { type: "string" } },
+      graphInsights: {
+        type: "array",
+        minItems: 4,
+        maxItems: 5,
+        items: {
+          type: "object",
+          additionalProperties: false,
+          required: ["title", "observation", "interpretation", "soWhat"],
+          properties: {
+            title: { type: "string" },
+            observation: { type: "string" },
+            interpretation: { type: "string" },
+            soWhat: { type: "string" }
+          }
+        }
+      },
       onePageBrief: { type: "array", minItems: 4, maxItems: 7, items: { type: "string" } },
       sourceNote: { type: "string" }
     }
@@ -608,6 +782,7 @@ function normalizeCompanyAnalysis(analysis, financials, reportType) {
     financialSoWhat: normalizeArray(analysis.financialSoWhat, fallback.financialSoWhat),
     investmentHighlights: normalizeArray(analysis.investmentHighlights, fallback.investmentHighlights),
     riskFactors: normalizeArray(analysis.riskFactors, fallback.riskFactors),
+    graphInsights: normalizeArray(analysis.graphInsights, fallback.graphInsights),
     onePageBrief: normalizeArray(analysis.onePageBrief, fallback.onePageBrief)
   };
 }
@@ -676,7 +851,7 @@ function buildCompanyAnalysisFallback(financials, reportType) {
   };
 }
 
-function buildIndustryFallback({ industry, scope, period, reportType }) {
+function buildLegacyIndustryFallbackFull({ industry, scope, period, reportType }) {
   const isAiSemi = /AI|반도체|HBM|semiconductor/i.test(industry);
   const isEnergy = /정유|화학|에너지|유틸|전력|LNG|가스/i.test(industry);
   const isAuto = /자동차|모빌리티|전기차|하이브리드|HEV/i.test(industry);
