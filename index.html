@@ -3018,7 +3018,7 @@
       }, 80);
     }
 
-    async function downloadCompanyWorkbook() {
+    function downloadCompanyWorkbook() {
       const raw = state.companyFinancials;
       const match = state.selectedCompany.match;
       const request = raw.request || {};
@@ -3029,26 +3029,15 @@
         report_code: request.report_code || "11011",
         fs_div: request.fs_div || "CFS"
       });
-      try {
-        const response = await fetchWithUiTimeout(apiUrl(`/api/export/company-workbook?${params.toString()}`), {}, 70000);
-        if (!response.ok) {
-          const payload = await response.json().catch(() => ({}));
-          throw new Error(payload.error || `HTTP ${response.status}`);
-        }
-        const blob = await response.blob();
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement("a");
-        const company = (raw.company?.name || match.name || els.companyName.value || "기업분석").replace(/[\\/:*?"<>|]/g, "");
-        link.href = url;
-        link.download = `${company}_기업분석.xlsx`;
-        document.body.appendChild(link);
-        link.click();
-        link.remove();
-        URL.revokeObjectURL(url);
-        showToast("기업분석 엑셀 산출물을 내려받았습니다.");
-      } catch (error) {
-        showToast(`엑셀 내려받기 실패: ${error.message}`);
-      }
+      const link = document.createElement("a");
+      const company = (raw.company?.name || match.name || els.companyName.value || "기업분석").replace(/[\\/:*?"<>|]/g, "");
+      link.href = apiUrl(`/api/export/company-workbook?${params.toString()}`);
+      link.download = `${company}_기업분석.xlsx`;
+      link.rel = "noopener";
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      showToast("브라우저 다운로드 목록을 확인해주세요.");
     }
 
     function showToast(message) {
