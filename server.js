@@ -14,6 +14,7 @@ const openaiKey = process.env.OPENAI_API_KEY || "";
 const openaiModel = process.env.OPENAI_MODEL || "gpt-4.1-mini";
 const dataDir = path.join(__dirname, "data");
 const dbPath = path.join(dataDir, "bit-analysis.sqlite");
+const companyTemplatePath = path.join(__dirname, "templates", "company-analysis-template.xlsx");
 const DART_BASE = "https://opendart.fss.or.kr/api";
 const OPENAI_RESPONSES_URL = "https://api.openai.com/v1/responses";
 
@@ -55,6 +56,15 @@ app.get("/api/company/refresh-master", async (req, res) => {
 
 app.get("/api/company/resolve", async (req, res) => {
   const query = String(req.query.q || "").trim();
+  const initialMatches = resolveCompanies(query);
+  if (initialMatches.length || !query) {
+    return res.json({
+      query,
+      source: dartKey ? "sqlite-seed" : "sqlite-seed",
+      matches: initialMatches
+    });
+  }
+
   try {
     await refreshCorpMaster({ force: false });
   } catch (error) {
@@ -772,6 +782,8 @@ async function generateCompanyAnalysis({ financials, reportType }) {
       "The output should feel like an analyst-built company study sheet: basic company identity first, business model second, DART financials third.",
       "Do not expose reasoning steps, analysis process, checklist language, or phrases like '확인해야 합니다'. The user only wants finished insights.",
       "Start with what the company does, what it mainly sells, who it serves, what value or strategy it claims, how it makes money, and only then connect the numbers.",
+      "Depth requirement: companyProfile fields must be specific to the company, not generic. Mention concrete product groups, customer/channel structure, strategy themes, and the business model in full sentences.",
+      "Depth requirement: for Hyundai Motor, cover finished vehicles, Genesis/SUV mix, HEV/EV transition, global production/sales channels, captive finance, incentives, FX, and Hyundai Motor Group ecosystem when relevant.",
       "The user hates generic 'how to analyze' language. Give concrete business structure and concrete 핵심 해석.",
       "Use the DART financial packet and market data supplied by the app. Use your own company knowledge for business structure, but do not invent exact segment revenue percentages unless provided.",
       "사업적 강점 means reasons the company is competitively or structurally interesting for study purposes. It is not investment advice.",
@@ -788,7 +800,8 @@ async function generateCompanyAnalysis({ financials, reportType }) {
       market_data: financials.market_data,
       valuation: financials.valuation,
       cash_flow_pattern: financials.cash_flow_pattern,
-      existing_numeric_insights: financials.insights
+      existing_numeric_insights: financials.insights,
+      business_context: companyStudyContext(financials.company && (financials.company.name || financials.company.corp_name))
     }),
     max_output_tokens: 6000,
     text: {
@@ -820,6 +833,41 @@ async function generateCompanyAnalysis({ financials, reportType }) {
   if (!text) throw new Error("OpenAI response did not contain output text.");
   const parsed = JSON.parse(text);
   return normalizeCompanyAnalysis(parsed, financials, reportType);
+}
+
+function companyStudyContext(name) {
+  const normalized = normalizeQuery(name || "");
+  if (normalized.includes("현대자동차") || normalized.includes("현대차")) {
+    return {
+      identity: "현대자동차는 완성차 제조·판매를 중심으로 금융, 부품/서비스, 미래 모빌리티 투자를 함께 운영하는 글로벌 OEM이다.",
+      core_business: [
+        "승용차/SUV/상용차 제조와 글로벌 판매",
+        "Genesis 등 고부가 브랜드와 SUV 중심 믹스 개선",
+        "하이브리드, 전기차, 수소전기차 등 전동화 라인업",
+        "현대캐피탈 등 자동차 금융과 리스/할부 기반 판매 지원",
+        "부품, AS, 커넥티드카, 소프트웨어 기반 서비스"
+      ],
+      revenue_logic: "매출은 판매대수, ASP, 차급/브랜드 믹스, 지역 믹스, 금융/리스 수익에서 나온다. 이익은 인센티브, 환율, 원재료, 물류비, 가동률, 금융부문 충당/조달비용에 민감하다.",
+      current_focus: "최근 분석 초점은 단순 판매대수보다 SUV/Genesis/HEV 비중, 미국·인도 등 지역 믹스, 전기차 수요 둔화 대응, 금융부문 건전성, 대규모 투자에도 현금흐름을 유지하는 능력이다.",
+      risk_context: "자동차 금융 부채와 제조업 차입금을 같은 방식으로 해석하면 안정성 판단이 왜곡된다. 금융부문은 판매를 돕지만 금리, 잔존가치, 연체율 리스크를 동반한다."
+    };
+  }
+  if (normalized.includes("삼성전자")) {
+    return {
+      identity: "삼성전자는 반도체, 스마트폰, 디스플레이, 가전으로 구성된 글로벌 종합 전자기업이다.",
+      core_business: ["메모리 반도체", "파운드리/시스템 반도체", "MX 스마트폰", "VD/가전", "디스플레이"],
+      revenue_logic: "매출은 메모리 가격/출하량, 스마트폰 판매량/ASP, 프리미엄 가전 믹스에서 나오며 이익은 반도체 업황과 고부가 제품 믹스에 민감하다.",
+      current_focus: "HBM, AI 서버향 메모리, 파운드리 수율, 스마트폰 프리미엄 믹스, 대규모 CAPEX 회수 가능성이 핵심이다.",
+      risk_context: "메모리 사이클, 파운드리 경쟁, CAPEX 부담, 환율과 세트 수요 둔화가 주요 리스크다."
+    };
+  }
+  return {
+    identity: "사업보고서의 사업부문 설명과 DART 재무를 함께 연결해 읽는 기업이다.",
+    core_business: [],
+    revenue_logic: "매출은 주력 제품/서비스의 가격, 물량, 고객 믹스로 형성되고 이익은 비용 구조와 가격 전가력에 의해 결정된다.",
+    current_focus: "기업 기본정보, 사업 구조, 매출/이익/현금흐름의 연결성이 핵심이다.",
+    risk_context: "사업부문 원문과 재무제표 계정의 연결이 부족하면 해석이 얕아진다."
+  };
 }
 
 function companyAnalysisSchema() {
@@ -1508,10 +1556,18 @@ function publicCorp(row) {
 
 async function buildFinancialsResponse({ corpCode, baseYear, years, reportCode, fsDiv }) {
   const company = db.prepare("SELECT * FROM corp_master WHERE corp_code = ?").get(corpCode) || null;
-  const periods = [];
-  for (let year = baseYear - years + 1; year <= baseYear; year += 1) {
-    periods.push(await getFinancialPeriod({ corpCode, year, reportCode, fsDiv }));
-  }
+  const periodYears = Array.from({ length: years }, (_, index) => baseYear - years + 1 + index);
+  const periods = await Promise.all(periodYears.map(year =>
+    getFinancialPeriod({ corpCode, year, reportCode, fsDiv }).catch(error => ({
+      year,
+      report_code: reportCode,
+      fs_div: fsDiv,
+      status: "timeout",
+      message: error.message,
+      raw_count: 0,
+      raw_items: []
+    }))
+  ));
 
   const normalized = periods.map(period => normalizeFinancialPeriod(period));
   addDerivedMetrics(normalized);
@@ -1893,6 +1949,13 @@ function buildCompanyInsights(company, latest, financials) {
 }
 
 async function buildCompanyWorkbook(financials) {
+  if (fs.existsSync(companyTemplatePath)) {
+    return buildCompanyWorkbookFromProvidedTemplate(financials);
+  }
+  return buildGeneratedCompanyWorkbook(financials);
+}
+
+async function buildGeneratedCompanyWorkbook(financials) {
   const workbook = new ExcelJS.Workbook();
   workbook.creator = "BIT Analysis";
   workbook.created = new Date();
@@ -1920,6 +1983,227 @@ async function buildCompanyWorkbook(financials) {
   }
 
   return workbook.xlsx.writeBuffer();
+}
+
+async function buildCompanyWorkbookFromProvidedTemplate(financials) {
+  const zip = new AdmZip(companyTemplatePath);
+  const summaryPath = worksheetPath(zip, "Summary");
+  const inputPath = worksheetPath(zip, "1");
+  if (!summaryPath || !inputPath) {
+    return buildGeneratedCompanyWorkbook(financials);
+  }
+
+  zip.updateFile(inputPath, Buffer.from(fillProvidedTemplateInputXml(zip.readAsText(inputPath), financials)));
+  zip.updateFile(summaryPath, Buffer.from(fillProvidedTemplateSummaryXml(zip.readAsText(summaryPath), financials)));
+
+  const workbookXml = zip.readAsText("xl/workbook.xml");
+  const nextWorkbookXml = setWorkbookFullRecalc(hideWorkbookSheets(workbookXml, ["2", "3"]));
+  zip.updateFile("xl/workbook.xml", Buffer.from(nextWorkbookXml));
+  return zip.toBuffer();
+}
+
+function worksheetPath(zip, sheetName) {
+  const workbookXml = zip.readAsText("xl/workbook.xml");
+  const relsXml = zip.readAsText("xl/_rels/workbook.xml.rels");
+  const sheetTag = workbookXml.match(new RegExp(`<sheet\\b(?=[^>]*\\bname="${escapeRegExp(sheetName)}")[^>]*>`, "u"))?.[0];
+  const relId = sheetTag?.match(/\br:id="([^"]+)"/u)?.[1];
+  if (!relId) return "";
+  const relTag = relsXml.match(new RegExp(`<Relationship\\b(?=[^>]*\\bId="${escapeRegExp(relId)}")[^>]*>`, "u"))?.[0];
+  const target = relTag?.match(/\bTarget="([^"]+)"/u)?.[1];
+  if (!target) return "";
+  return target.startsWith("/") ? target.replace(/^\//u, "") : `xl/${target}`.replace(/\/[^/]+\/\.\.\//gu, "/");
+}
+
+function fillProvidedTemplateInputXml(xml, financials) {
+  const periods = templatePeriods(financials);
+  const cells = {
+    A3: textCell("회사명"),
+    B3: textCell(financials.company.name || financials.company.corp_code),
+    C3: textCell("상장여부"),
+    D3: textCell(financials.company.stock_code ? "상장" : "비상장"),
+    G3: textCell("(단위: 백만, DART 원천값/1,000,000)")
+  };
+
+  for (let index = 0; index < 5; index += 1) {
+    const col = String.fromCharCode("B".charCodeAt(0) + index);
+    const period = periods[index];
+    cells[`${col}5`] = period ? numberCell(Number(period.year)) : blankCell();
+  }
+
+  const rows = [
+    [6, "revenue"],
+    [7, "operating_income"],
+    [8, "depreciation"],
+    [9, "amortization"],
+    [11, "net_income"],
+    [12, "total_assets"],
+    [13, "total_liabilities"],
+    [14, "total_equity"],
+    [15, "short_term_debt"],
+    [16, "long_term_debt"],
+    [18, "cash_and_equivalents"],
+    [20, "operating_cash_flow"],
+    [21, "investing_cash_flow"],
+    [22, "financing_cash_flow"]
+  ];
+
+  for (let index = 0; index < 5; index += 1) {
+    const col = String.fromCharCode("B".charCodeAt(0) + index);
+    const period = periods[index];
+    for (const [row, key] of rows) {
+      cells[`${col}${row}`] = period ? numberOrBlankCell(toMillion(period.metrics[key])) : blankCell();
+    }
+    cells[`${col}10`] = period && Number.isFinite(period.metrics.ebitda)
+      ? numberCell(toMillion(period.metrics.ebitda))
+      : formulaCell(`IF(OR(ISBLANK(${col}8),ISBLANK(${col}9)),"D&A 보강 필요",${col}7+${col}8+${col}9)`);
+    cells[`${col}17`] = period ? formulaCell(`${col}15+${col}16`) : blankCell();
+    cells[`${col}19`] = period ? formulaCell(`${col}17-${col}18`) : blankCell();
+  }
+
+  return updateSheetCells(xml, cells);
+}
+
+function fillProvidedTemplateSummaryXml(xml, financials) {
+  const periods = templatePeriods(financials);
+  const latest = latestPeriod(financials);
+  const metrics = latest.metrics || {};
+  const marketData = financials.market_data || {};
+  const valuation = financials.valuation || buildValuation(metrics, marketData);
+  const pattern = financials.cash_flow_pattern || metrics.cash_flow_pattern || classifyCashFlowPattern(metrics);
+  const company = financials.company.name || financials.company.corp_code;
+  const cells = {
+    B3: textCell(new Date().toISOString().slice(0, 10)),
+    C5: numberCell(1),
+    L6: numberOrTextCell(marketData.no_of_shares, "리서치 필요"),
+    M6: numberOrTextCell(marketData.stock_price, "리서치 필요"),
+    N6: formulaCell('IFERROR(L6*M6/1000000,"입력 필요")'),
+    N7: formulaCell('IFERROR(N6/I8,"-")'),
+    N8: formulaCell('IFERROR(N6+I17,"-")'),
+    N9: formulaCell('IFERROR(N8/I7,"-")'),
+    O17: textCell(`○ 영업현금흐름: ${formatWon(metrics.operating_cash_flow)}. ${pattern.type}: ${pattern.description}`),
+    O19: textCell(`○ 투자현금흐름: ${formatWon(metrics.investing_cash_flow)}. 설비투자, M&A, 금융상품 운용 여부를 분리 확인`),
+    O21: textCell(`○ 재무현금흐름: ${formatWon(metrics.financing_cash_flow)}. 차입, 상환, 배당, 증자 이벤트 확인`),
+    Y5: textCell(`○ ${company} 기업 기본정보와 사업 포지션`),
+    Z5: textCell("○ 사업적 강점"),
+    AA5: textCell("DART API 기준 자동 생성. 주가/발행주식수는 별도 시장 데이터 기준일 확인 필요."),
+    Y14: textCell("○ 기업 분석 메모"),
+    Y15: textCell("사업보고서의 사업부, 주요 제품, 고객, 시장 전망과 재무 변화 연결"),
+    Y16: textCell("매출 성장, 마진, 현금흐름으로 확인되는 회사 고유 경쟁력을 우선 해석"),
+    Z14: textCell("○ 리스크 요인"),
+    Z15: textCell("매출 둔화, 마진 하락, 운전자본 부담, 차입금 증가, 투자회수 지연"),
+    AA14: textCell("작성 가이드 반영"),
+    AA15: textCell(`DART 최신 사업보고서 우선, 5개년 확보 시 과거 공시 조회, 음수 부호 유지, D&A 주석 확인. ${formatMarketDataNote(marketData, valuation)}`)
+  };
+
+  for (let index = 0; index < 5; index += 1) {
+    const col = String.fromCharCode("E".charCodeAt(0) + index);
+    const period = periods[index];
+    cells[`${col}4`] = period ? numberCell(Number(period.year)) : blankCell();
+  }
+
+  return hideSheetRows(updateSheetCells(xml, cells), 22, 98);
+}
+
+function updateSheetCells(xml, cells) {
+  let nextXml = xml;
+  for (const [ref, cell] of Object.entries(cells)) {
+    nextXml = updateSheetCell(nextXml, ref, cell);
+  }
+  return nextXml;
+}
+
+function updateSheetCell(xml, ref, cell) {
+  const existingCell = xml.match(new RegExp(`<c\\b(?=[^>]*\\br="${escapeRegExp(ref)}")[^>]*\\/>|<c\\b(?=[^>]*\\br="${escapeRegExp(ref)}")[\\s\\S]*?<\\/c>`, "u"))?.[0];
+  const style = existingCell?.match(/\bs="([^"]+)"/u)?.[1];
+  const nextCell = cellXml(ref, cell, style);
+  if (existingCell) return xml.replace(existingCell, nextCell);
+
+  const rowNumber = cellRef(ref).row;
+  const rowRegex = new RegExp(`(<row\\b(?=[^>]*\\br="${rowNumber}")[^>]*>)([\\s\\S]*?)(<\\/row>)`, "u");
+  if (rowRegex.test(xml)) {
+    return xml.replace(rowRegex, `$1$2${nextCell}$3`);
+  }
+  return xml.replace("</sheetData>", `<row r="${rowNumber}">${nextCell}</row></sheetData>`);
+}
+
+function cellXml(ref, cell, style) {
+  const styleAttr = style ? ` s="${escapeXml(style)}"` : "";
+  if (cell.type === "formula") {
+    return `<c r="${ref}"${styleAttr}><f>${escapeXml(cell.formula)}</f></c>`;
+  }
+  if (cell.type === "blank" || cell.value === null || cell.value === undefined || cell.value === "") {
+    return `<c r="${ref}"${styleAttr}/>`;
+  }
+  if (cell.type === "number") {
+    return `<c r="${ref}"${styleAttr}><v>${cell.value}</v></c>`;
+  }
+  return `<c r="${ref}"${styleAttr} t="inlineStr"><is><t>${escapeXml(String(cell.value))}</t></is></c>`;
+}
+
+function textCell(value) {
+  return { type: "text", value };
+}
+
+function numberCell(value) {
+  return { type: "number", value };
+}
+
+function numberOrBlankCell(value) {
+  return Number.isFinite(value) ? numberCell(value) : blankCell();
+}
+
+function numberOrTextCell(value, fallback) {
+  return Number.isFinite(value) ? numberCell(value) : textCell(fallback);
+}
+
+function formulaCell(formula) {
+  return { type: "formula", formula };
+}
+
+function blankCell() {
+  return { type: "blank" };
+}
+
+function cellRef(ref) {
+  const match = String(ref).match(/^([A-Z]+)(\d+)$/u);
+  return { col: match?.[1] || "", row: Number(match?.[2] || 0) };
+}
+
+function hideSheetRows(xml, start, end) {
+  let nextXml = xml;
+  for (let row = start; row <= end; row += 1) {
+    nextXml = nextXml.replace(new RegExp(`<row\\b(?=[^>]*\\br="${row}")(?![^>]*\\bhidden=)[^>]*>`, "u"), match => match.replace(/>$/u, ' hidden="1">'));
+  }
+  return nextXml;
+}
+
+function hideWorkbookSheets(workbookXml, sheetNames) {
+  return sheetNames.reduce((xml, sheetName) => xml.replace(
+    new RegExp(`<sheet\\b(?=[^>]*\\bname="${escapeRegExp(sheetName)}")(?![^>]*\\bstate=)[^>]*>`, "u"),
+    match => match.endsWith("/>")
+      ? match.replace(/\/>$/u, ' state="hidden"/>')
+      : match.replace(/>$/u, ' state="hidden">')
+  ), workbookXml);
+}
+
+function setWorkbookFullRecalc(workbookXml) {
+  const calcPr = '<calcPr calcMode="auto" fullCalcOnLoad="1" forceFullCalc="1"/>';
+  if (/<calcPr\b[^>]*\/>/u.test(workbookXml)) return workbookXml.replace(/<calcPr\b[^>]*\/>/u, calcPr);
+  if (/<calcPr\b[\s\S]*?<\/calcPr>/u.test(workbookXml)) return workbookXml.replace(/<calcPr\b[\s\S]*?<\/calcPr>/u, calcPr);
+  return workbookXml.replace("</workbook>", `${calcPr}</workbook>`);
+}
+
+function escapeXml(value) {
+  return String(value)
+    .replace(/&/gu, "&amp;")
+    .replace(/</gu, "&lt;")
+    .replace(/>/gu, "&gt;")
+    .replace(/"/gu, "&quot;")
+    .replace(/'/gu, "&apos;");
+}
+
+function escapeRegExp(value) {
+  return String(value).replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
 }
 
 function latestPeriod(financials) {
