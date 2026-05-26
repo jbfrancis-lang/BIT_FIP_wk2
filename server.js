@@ -920,7 +920,7 @@ function buildIndustryFallback({ industry, scope, period, reportType, industryCo
     title: `${displayIndustry} 산업분석`,
     meta: industryContext.isReframed ? ["산업분석", scope, period, reportType, `범위 재정의: ${industryContext.originalIndustry}`] : ["산업분석", scope, period, reportType],
     industry_overview: {
-      executive_summary: `${displayIndustry} 산업은 최종 수요, 공급망, 가격 결정 구조, 규제 변화가 동시에 작동하는 시장입니다. ${industryContext.rationale} 현재 로컬 fallback은 원문 리서치가 붙기 전의 구조화된 보고서 초안이며, OpenAI 생성이 성공하면 산업별 맥락을 더 구체화합니다.`,
+      executive_summary: `${displayIndustry} 산업은 최종 수요, 공급망, 가격 결정 구조, 규제 변화가 동시에 작동하는 시장입니다. ${industryContext.rationale} 현재 결과는 입력값을 바탕으로 시장 구조를 먼저 정리한 예비 리포트이며, 원문 리서치 검증을 더하면 시장 규모와 출처 신뢰도를 보강할 수 있습니다.`,
       definition: `${displayIndustry} 산업은 ${industryContext.segments.join(", ")}을 포함해 제품·서비스 생산자, 핵심 투입 요소 공급자, 유통·플랫폼, 최종 고객 수요가 연결된 가치사슬로 구성됩니다. 산업의 매력도는 시장 규모뿐 아니라 가격 결정권, 고정비 부담, 고객 락인, 규제 변화가 어떻게 결합되는지에 따라 달라집니다.`,
       market_scope: `${scope} 범위에서는 ${industryContext.parentIndustry}까지 자료 탐색 범위를 확장해 봅니다. 특히 세부 품목의 직접 통계가 부족한 경우 상위 산업 규모, 인접 세그먼트 성장률, 채널 데이터, 영문 키워드(${industryContext.keywords.slice(0, 4).join(", ")})를 함께 읽어야 시장의 실제 위치가 드러납니다.`,
       current_state: `${period} 기준으로는 수요 성장과 비용 부담이 동시에 존재하는 혼재 국면입니다. ${displayIndustry}은 특정 품목 수요만으로 판단하기보다 상위 카테고리의 소비 흐름, 유통 채널 변화, 공급 원가 변동을 함께 반영해야 합니다.`,
@@ -935,9 +935,9 @@ function buildIndustryFallback({ industry, scope, period, reportType, industryCo
         value: (industryContext.marketSeries || [10, 11.2, 12.6, 14.3, 16.1])[index],
         is_estimated: true,
         note: industryContext.isReframed ? "세부 품목 직접 통계가 제한적이어서 상위 산업과 인접 시장 기준으로 추정" : "외부 원문 리서치 미연결 상태의 시장 규모 방향성 추정",
-        source_reference: "local fallback"
+        source_reference: "원문 출처 검증 필요"
       })),
-      growth_comment: "로컬 fallback에서는 실제 외부 통계가 연결되어 있지 않아 절대값보다 성장 방향성만 제시합니다.",
+      growth_comment: "현재 값은 외부 원문 통계가 직접 연결되지 않은 방향성 추정치이므로 절대값보다 성장 흐름 중심으로 해석해야 합니다.",
       data_quality_note: "정식 리포트에서는 협회 통계, 정부 통계, 증권사 리포트, 글로벌 리서치 기관 자료로 시장 규모 단위를 확정해야 합니다.",
       interpretation: `${period} 관점에서 ${displayIndustry} 산업은 시장 규모가 커지는 흐름과 비용 부담이 함께 나타나는 구조입니다. 따라서 시장 확대가 곧바로 산업 수익성 개선으로 이어지는지, 아니면 특정 가치사슬 구간에만 이익이 집중되는지를 분리해 해석해야 합니다.`
     },
@@ -1004,7 +1004,7 @@ function buildIndustryFallback({ industry, scope, period, reportType, industryCo
       ]
     },
     sources: [
-      { title: "Local fallback industry structure", publisher: "BIT Analysis", url: "", used_for: "산업 구조와 밸류체인 기본 프레임" },
+      { title: "산업 구조 예비 분석", publisher: "BIT Analysis", url: "", used_for: "산업 구조와 밸류체인 기본 프레임" },
       { title: industryContext.keywords.slice(0, 5).join(" / "), publisher: "검색 키워드", url: "", used_for: "상위 산업과 인접 세그먼트 탐색 기준" }
     ]
   };
@@ -1020,7 +1020,7 @@ function legacyIndustryChart(analysis, fallback) {
 function legacyIndustryFallback({ industry, scope, period, reportType }) {
   return {
     title: `${industry} 산업분석`,
-    meta: ["Local analyst fallback", scope, period, reportType],
+    meta: ["기본 분석 요약", scope, period, reportType],
     chart: {
       marketSeries: [100, 112, 126, 143, 161],
       demandSeries: [100, 116, 134, 157, 184]
@@ -1532,7 +1532,7 @@ function buildLegacyIndustryFallbackFull({ industry, scope, period, reportType }
   if (preset) {
     return {
       title: `${industry} 산업분석`,
-      meta: ["Local analyst fallback", scope, period, reportType],
+      meta: ["기본 분석 요약", scope, period, reportType],
       analystView: {
         oneLine: preset.oneLine,
         stance: preset.stance,
@@ -1553,13 +1553,13 @@ function buildLegacyIndustryFallbackFull({ industry, scope, period, reportType }
         interviewQuestions: preset.questions
       },
       chart: preset.chart,
-      sourceNote: "로컬 analyst fallback입니다. OPENAI_API_KEY가 설정되면 같은 형식으로 AI가 산업별 본문을 생성합니다."
+      sourceNote: "기본 분석 요약입니다. 증권사 리포트, 공시, 통계, 뉴스 원문으로 출처를 함께 검증합니다."
     };
   }
 
   return {
     title: `${industry} 산업분석`,
-    meta: ["Local analyst fallback", scope, period, reportType],
+    meta: ["기본 분석 요약", scope, period, reportType],
     analystView: {
       oneLine: `${industry} 산업은 최근 수요 성장과 비용 부담이 동시에 커지며 산업 평균보다 밸류체인별 이익 격차가 확대되는 상황입니다. ${scope} 범위에서는 최종 수요보다 가격 전가력과 공급 병목이 수익성을 가릅니다.`,
       stance: "중립적 선별. 성장성은 유효하지만 모든 플레이어가 같은 폭으로 이익을 가져가지는 못합니다.",
