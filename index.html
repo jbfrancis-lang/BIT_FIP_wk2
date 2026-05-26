@@ -1682,7 +1682,6 @@
                 <select id="reportType">
                   <option value="" selected>리포트 유형 선택</option>
                   <option>요약 Brief</option>
-                  <option>상세 분석</option>
                   <option>심층 분석</option>
                 </select>
               </div>
@@ -1697,7 +1696,7 @@
                   <input id="baseYear" inputmode="numeric" value="2025" aria-label="DART 기준 사업연도">
                 </div>
                 <div class="source-stack" id="companySourceStack">
-                  <div class="source-item">상세 분석 생성 시 OpenDART 5개년 재무와 시장 데이터 보완값을 함께 조회합니다.</div>
+                  <div class="source-item">분석 생성 시 OpenDART 5개년 재무와 시장 데이터 보완값을 함께 조회합니다.</div>
                 </div>
               </div>
 
@@ -2204,7 +2203,7 @@
       if (profile) {
         return {
           title: `${company} 기업분석`,
-          meta: ["기업분석", els.reportType.value || "상세 분석", "사업구조 + DART"],
+          meta: ["기업분석", els.reportType.value || "요약 Brief", "사업구조 + DART"],
           companyProfile: {
             identity: `${company}은 사업 구조와 재무 성과를 함께 읽어야 하는 분석 대상 기업입니다.`,
             coreBusiness: profile.chain[0] ? profile.chain[0][1] : "핵심 사업 확인 필요",
@@ -2241,7 +2240,7 @@
 
       return {
         title: `${company} 기업분석`,
-        meta: ["기업분석", els.reportType.value || "상세 분석", "DART 기반"],
+        meta: ["기업분석", els.reportType.value || "요약 Brief", "DART 기반"],
         companyProfile: {
           identity: `${company}은 기업 기본정보, 사업 구조, 재무 성과를 순서대로 읽어야 하는 분석 대상 기업입니다.`,
           coreBusiness: "주요 사업은 사업보고서의 사업부문 설명을 기준으로 보강됩니다.",
@@ -3282,7 +3281,7 @@
     }
 
     function reportTypeOptions() {
-      return ["요약 Brief", "상세 분석", "심층 분석"];
+      return ["요약 Brief", "심층 분석"];
     }
 
     function updateBriefToggleLabel() {
@@ -3395,7 +3394,7 @@
     document.getElementById("companyName").addEventListener("input", () => {
       state.companyFinancials = null;
       state.selectedCompany = null;
-      els.companySourceStack.innerHTML = `<div class="source-item">상세 분석 생성 시 OpenDART 5개년 재무와 시장 데이터 보완값을 함께 조회합니다.</div>`;
+      els.companySourceStack.innerHTML = `<div class="source-item">분석 생성 시 OpenDART 5개년 재무와 시장 데이터 보완값을 함께 조회합니다.</div>`;
       renderReport();
     });
     document.getElementById("generateBtn").addEventListener("click", generateAnalysis);

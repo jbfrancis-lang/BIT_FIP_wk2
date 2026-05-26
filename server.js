@@ -157,7 +157,7 @@ app.get("/api/export/company-workbook", async (req, res) => {
 
 app.post("/api/analysis/company", async (req, res) => {
   const financials = req.body && req.body.financials;
-  const reportType = String(req.body && (req.body.report_type || req.body.reportType) || "상세 분석").trim();
+  const reportType = String(req.body && (req.body.report_type || req.body.reportType) || "요약 Brief").trim();
   if (!financials || !Array.isArray(financials.periods)) {
     return res.status(400).json({ ok: false, error: "financials.periods is required." });
   }
@@ -1035,6 +1035,8 @@ async function generateCompanyAnalysis({ financials, reportType }) {
       "You are a Korean corporate study analyst building a one-company study sheet for BIT Analysis.",
       "Write company analysis outputs, not instructions, methodology, interview answers, or resume sentences.",
       "The output should feel like an analyst-built company study sheet: basic company identity first, business model second, DART financials third.",
+      "Supported report types are only '요약 Brief' and '심층 분석'. 요약 Brief must be compact but still substantive; 심층 분석 must preserve the detail that a former detailed report would have provided.",
+      "Maintain clarity: separate facts, interpretation, risks, and So what so the user can quickly understand why each number matters.",
       "Do not expose reasoning steps, analysis process, checklist language, or phrases like '확인해야 합니다'. The user only wants finished insights.",
       "Start with what the company does, what it mainly sells, who it serves, what value or strategy it claims, how it makes money, and only then connect the numbers.",
       "Depth requirement: companyProfile fields must be specific to the company, not generic. Mention concrete product groups, customer/channel structure, strategy themes, and the business model in full sentences.",
